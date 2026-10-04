@@ -49,6 +49,12 @@ var _cctv_points: Array = []
 var _cctv_idx := 0
 var _sfx: AudioStreamPlayer
 var _voice: AudioStreamPlayer
+var _inventory: Label
+var _tape_panel: PanelContainer
+var _tape_title: Label
+var _tape_line: Label
+var _tape_player: AudioStreamPlayer
+var _tape_timings: Array = []
 
 var _messages: Array[Dictionary] = []
 var _msg_time := 0.0
@@ -77,12 +83,12 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
 
-	_clock = UIKit.label(_root, "12:00 AM", 40, UIKit.TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
+	_clock = UIKit.flabel(_root, "12:00 AM", 40, "head", UIKit.TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
 	UIKit.place(_clock, Control.PRESET_TOP_RIGHT, Vector2(-300, 16), Vector2(280, 50))
-	_night_label = UIKit.label(_root, "NIGHT 1", 17, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+	_night_label = UIKit.flabel(_root, "NIGHT 1", 17, "head_light", UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
 	UIKit.place(_night_label, Control.PRESET_TOP_RIGHT, Vector2(-300, 64), Vector2(280, 24))
 
-	_tasks = UIKit.label(_root, "", 19)
+	_tasks = UIKit.flabel(_root, "", 21, "body")
 	UIKit.place(_tasks, Control.PRESET_TOP_LEFT, Vector2(24, 18), Vector2(640, 320))
 
 	_battery_box = VBoxContainer.new()
@@ -134,6 +140,26 @@ func _build() -> void:
 	ht.tween_interval(45.0)
 	ht.tween_property(hint, "modulate:a", 0.0, 3.0)
 
+	_inventory = UIKit.flabel(_root, "", 17, "head_light", Color(0.85, 0.82, 0.7))
+	UIKit.place(_inventory, Control.PRESET_BOTTOM_LEFT, Vector2(300, -48), Vector2(400, 26))
+
+	# Tape player
+	_tape_panel = PanelContainer.new()
+	_tape_panel.add_theme_stylebox_override("panel", UIKit.box(Color(0.02, 0.02, 0.02, 0.78), 16, 4, Color(0.5, 0.42, 0.25, 0.8)))
+	UIKit.place(_tape_panel, Control.PRESET_BOTTOM_RIGHT, Vector2(-560, -230), Vector2(536, 120))
+	_tape_panel.visible = false
+	_tape_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_tape_panel)
+	var tv := VBoxContainer.new()
+	_tape_panel.add_child(tv)
+	_tape_title = UIKit.flabel(tv, "", 18, "mono", Color(1.0, 0.75, 0.35))
+	_tape_line = UIKit.flabel(tv, "", 19, "italic", UIKit.TEXT)
+	_tape_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tape_line.custom_minimum_size = Vector2(500, 0)
+	_tape_player = AudioStreamPlayer.new()
+	_tape_player.bus = "Voice"
+	add_child(_tape_player)
+
 	# Journal
 	_journal = PanelContainer.new()
 	_journal.add_theme_stylebox_override("panel", UIKit.box(Color(0.9, 0.86, 0.75, 0.97), 22, 4))
@@ -144,7 +170,10 @@ func _build() -> void:
 	_journal_text.bbcode_enabled = true
 	_journal_text.scroll_active = false
 	_journal_text.add_theme_color_override("default_color", Color(0.15, 0.12, 0.1))
-	_journal_text.add_theme_font_size_override("normal_font_size", 17)
+	_journal_text.add_theme_font_size_override("normal_font_size", 19)
+	_journal_text.add_theme_font_override("normal_font", UIKit.font("body"))
+	_journal_text.add_theme_font_override("bold_font", UIKit.font("head"))
+	_journal_text.add_theme_font_override("italics_font", UIKit.font("italic"))
 	_journal_text.add_theme_font_size_override("bold_font_size", 22)
 	_journal.add_child(_journal_text)
 
@@ -189,7 +218,7 @@ func _build() -> void:
 	sm.shader = preload("res://shaders/cctv.gdshader")
 	scan.material = sm
 	_cctv.add_child(scan)
-	_cctv_label = UIKit.label(_cctv, "", 26, Color(0.75, 1.0, 0.8))
+	_cctv_label = UIKit.flabel(_cctv, "", 34, "mono", Color(0.75, 1.0, 0.8))
 	UIKit.place(_cctv_label, Control.PRESET_TOP_LEFT, Vector2(40, 30), Vector2(900, 40))
 	var ch := UIKit.label(_cctv, "A / D  switch camera      E  stop watching", 18, Color(0.75, 1.0, 0.8), HORIZONTAL_ALIGNMENT_CENTER)
 	UIKit.place(ch, Control.PRESET_CENTER_BOTTOM, Vector2(-400, -60), Vector2(800, 30))
@@ -202,13 +231,13 @@ func _build() -> void:
 	_root.add_child(_title_card)
 	var tvb := UIKit.center_box(_title_card, 6)
 	tvb.get_parent().mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_title_big = UIKit.label(tvb, "", 72, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
-	_title_small = UIKit.label(tvb, "", 28, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	_title_big = UIKit.flabel(tvb, "", 76, "title", UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	_title_small = UIKit.flabel(tvb, "", 30, "head_light", UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 
 	# Pause
 	_pause = UIKit.overlay(_root, Color(0, 0, 0, 0.78))
 	var pbox := UIKit.center_box(_pause)
-	UIKit.label(pbox, "PAUSED", 52, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	UIKit.flabel(pbox, "Paused", 56, "title", UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	UIKit.label(pbox, "Coffee break. The exhibits are also on break. Probably.", 18, UIKit.DIM, HORIZONTAL_ALIGNMENT_CENTER)
 	UIKit.button(pbox, "Resume", _toggle_pause)
 	UIKit.button(pbox, "Settings", func() -> void: _settings.visible = true)
@@ -226,7 +255,7 @@ func _build() -> void:
 	# End screen
 	_end = UIKit.overlay(_root, Color(0, 0, 0, 0.86))
 	var ebox := UIKit.center_box(_end)
-	_end_title = UIKit.label(ebox, "", 66, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	_end_title = UIKit.flabel(ebox, "", 66, "title", UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	_end_text = UIKit.label(ebox, "", 20, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	_end_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_end_text.custom_minimum_size = Vector2(820, 0)
@@ -289,6 +318,22 @@ func _process(delta: float) -> void:
 			_carry.text = "Carrying: Sir Clanksworth's sword"
 		_:
 			_carry.text = ""
+	var inv := PackedStringArray()
+	if player.has_camera:
+		inv.append("FILM x%d  [R]" % player.film)
+	if player.ducks > 0:
+		inv.append("SQUEAKY DUCKS x%d  [G]" % player.ducks)
+	_inventory.text = "      ".join(inv)
+	if _tape_player.playing:
+		var pos := _tape_player.get_playback_position()
+		var line := ""
+		for tl in _tape_timings:
+			if pos >= float(tl[0]):
+				line = tl[1]
+		_tape_line.text = line
+		Music.duck_for(0.3)
+	elif _tape_panel.visible:
+		_tape_panel.visible = false
 	if _journal.visible:
 		_refresh_journal()
 	if get_tree().paused:
@@ -377,6 +422,12 @@ func _refresh_journal() -> void:
 	for id in found:
 		titles.append(Notes.title(int(id)))
 	s += ", ".join(titles)
+	var tapes: Array = Save.progress.get("tapes", [])
+	s += "\n\n[b]Tapes found: %d / %d[/b]\n" % [tapes.size(), Tapes.LIST.size()]
+	var tt := PackedStringArray()
+	for id in tapes:
+		tt.append(Tapes.title(int(id)))
+	s += ", ".join(tt)
 	_journal_text.text = s
 
 
@@ -387,6 +438,10 @@ func open_journal() -> void:
 func show_note(id: int) -> void:
 	_note_title.text = Notes.title(id)
 	_note_text.text = Notes.text(id)
+	var st := Notes.style(id)
+	_note_text.add_theme_font_override("font", UIKit.font({"type": "type", "hand": "hand", "print": "body"}.get(st, "body")))
+	_note_text.add_theme_font_size_override("font_size", {"type": 17, "hand": 25, "print": 20}.get(st, 18))
+	_note_title.add_theme_font_override("font", UIKit.font("head"))
 	_note.visible = true
 	_journal.visible = false
 	_reading = true
@@ -448,10 +503,39 @@ func _next_message() -> void:
 	_subtitle_panel.visible = bool(Save.settings["subtitles"]) or speaker == ""
 	_msg_time = m["duration"]
 	if speaker.begins_with("BRENDA"):
-		_play(preload("res://audio/radio_squelch.wav"), -10.0)
-		_voice.stream = BABBLE[randi() % BABBLE.size()]
-		_voice.pitch_scale = randf_range(0.95, 1.08)
+		var path := "res://audio/voice/line_%s.ogg" % String(m["text"]).md5_text().substr(0, 10)
+		if ResourceLoader.exists(path):
+			_voice.stream = load(path)
+			_voice.pitch_scale = 1.0
+			_voice.volume_db = -2.0
+			_msg_time = maxf(_msg_time, _voice.stream.get_length() + 0.4)
+		else:
+			_play(preload("res://audio/radio_squelch.wav"), -10.0)
+			_voice.stream = BABBLE[randi() % BABBLE.size()]
+			_voice.pitch_scale = randf_range(0.95, 1.08)
+			_voice.volume_db = -8.0
 		_voice.play()
+
+
+func play_tape(id: int) -> void:
+	var path := "res://audio/voice/tape_%d.ogg" % id
+	if not ResourceLoader.exists(path):
+		return
+	_tape_player.stream = load(path)
+	_tape_player.play()
+	_tape_timings = []
+	var f := FileAccess.open("res://audio/voice/tape_%d.json" % id, FileAccess.READ)
+	if f:
+		var parsed = JSON.parse_string(f.get_as_text())
+		if parsed is Array:
+			_tape_timings = parsed
+	_tape_title.text = "> PLAYING  %s  -  %s" % [Tapes.title(id).to_upper(), Tapes.who(id)]
+	_tape_line.text = ""
+	_tape_panel.visible = true
+
+
+func is_tape_playing() -> bool:
+	return _tape_player.playing
 
 
 func _show_alert(text: String) -> void:

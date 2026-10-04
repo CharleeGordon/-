@@ -1,31 +1,62 @@
 extends NightBase
-## NIGHT 2 - Clockwork. The Hall of Curiosities reopens. Keep Little Wolfgang wound.
+## NIGHT 2 - Clockwork. The Hall of Curiosities and the first rooms upstairs open.
+## Keep Little Wolfgang wound, fix the lights, meet the Tea Party, get the camera.
 
 var _sword: Interactable
 var _return_spot: Interactable
 
 
 func note_ids() -> Array:
-	return [4, 5, 6]
+	return [4, 5, 8, 9]
+
+
+func tape_ids() -> Array:
+	return [4, 11]
 
 
 func battery_count() -> int:
-	return 4
+	return 5
+
+
+func film_count() -> int:
+	return 3
+
+
+func scares() -> Array:
+	return [
+		{"room": "toyroom", "hour": 0, "type": "giggle", "pos": Vector3(12, 6.2, 16)},
+		{"room": "curio", "hour": 2, "type": "slam"},
+		{"room": "director", "hour": 3, "type": "steps"},
+		{"room": "lobby", "hour": 4, "type": "apparition", "pos": Vector3(0, 5.5, -8.5)},
+	]
+
+
+func banter() -> Array:
+	return [
+		"Little Wolfgang's song is called The Pemberton Waltz. It's the only song he knows. He has played it four hundred thousand times. He is not tired of it. I am.",
+		"The Director says hello. I've never actually met the Director. She leaves notes. Lovely handwriting.",
+		"If a doll asks you to tea, the correct answer is no thank you, I'm driving.",
+		"Did you know the Tea Party has six cups and five dolls? Please don't think about that too hard.",
+		"The sword incident is the third this month. Sir Clanksworth is very careless with his pointy things.",
+		"Upstairs is lovely. Upstairs has carpets. Upstairs also has the dolls. Swings and roundabouts.",
+	]
 
 
 func setup(restoring: bool) -> void:
 	Music.set_base("calm")
-	open_door("DoorCurio", true)
-	open_door("DoorCurio2", true)
+	open_doors(["DoorCurio", "DoorCurio2"])
+	open_stairs()
 	start_basics(true, restoring)
 	mummy().enabled = true
 	set_active("WindCrank", true)
+	set_active("CameraPickup", true)
 	if restoring:
 		restore_checkpoints()
 		_restore_bulbs()
+		_restore_items()
 		return
 	brenda("Night two! You came back. Most people don't. That's a joke. Mostly.", 4.5)
-	brenda("The Hall of Curiosities is open again. Clock in and I'll explain.", 4.5)
+	brenda("Big night. The Curiosities hall is open, and so is part of upstairs. Clock in and I'll explain.", 5.0)
 
 
 func handle(action: String, n: Node) -> bool:
@@ -35,6 +66,7 @@ func handle(action: String, n: Node) -> bool:
 				return true
 			player.play_sfx(preload("res://audio/stamp.wav"))
 			Shift.complete_task("clock_in")
+			Shift.add_task("camera", "Collect your new equipment from the Director's office (upstairs)")
 			Shift.add_task("patrol", "Patrol: scan the checkpoints (Gallery, Egyptian Hall, Dinosaur Hall, Curiosities)", 4)
 			Shift.add_task("bulbs", "Replace the 3 dead bulbs in the Hall of Curiosities (spares are in Storage)", 3)
 			Shift.add_task("wind", "Keep Little Wolfgang wound up (Hall of Curiosities)")
@@ -42,17 +74,25 @@ func handle(action: String, n: Node) -> bool:
 			set_active("BulbBox", true)
 			for i in 3:
 				set_active("Socket%d" % (i + 1), true)
-			brenda("In the Curiosities hall there's a clockwork boy called Little Wolfgang. He plays a song.", 5.0)
-			brenda("Keep him wound. When the music slows down, wind him. When the music stops... hide.", 5.5)
+			brenda("First: the Director left you a present upstairs. Grand staircase, then the office at the back.", 5.0)
+			brenda("Then: in the Curiosities hall there's a clockwork boy, Little Wolfgang. When his music slows down, wind him. When it stops... hide.", 6.0)
+			return true
+		"camera":
+			player.has_camera = true
+			player.film += 3
+			n.queue_free()
+			player.play_sfx(preload("res://audio/pickup.wav"), -2.0)
+			Shift.complete_task("camera")
+			Shift.alert.emit("Instant camera! R (or right mouse) for a blinding flash that stuns exhibits.")
+			brenda("An instant camera! Museum photography is strictly forbidden. Use it anyway. Just never on Gerald.", 5.0)
+			brenda("While you're up there, pop into the Toy Room and check on the Tea Party. Don't take your eyes off them.", 5.0)
+			Shift.add_task("teaparty", "Check on the Tea Party in the Toy Room (upstairs)")
+			set_flag("camera", true)
 			return true
 		"checkpoint_gallery", "checkpoint_egypt", "checkpoint_dino", "checkpoint_curio":
 			scan_checkpoint(n)
 			return true
 		"wind_automaton":
-			if not automaton().enabled:
-				Shift.alert.emit("Little Wolfgang is fully wound. He's watching you. Politely.")
-				automaton().wind()
-				return true
 			if automaton().is_hunting():
 				Shift.alert.emit("He's not in his booth. WHERE IS HE.")
 				return true
@@ -101,9 +141,23 @@ func handle(action: String, n: Node) -> bool:
 			_return_spot.active = false
 			player.play_sfx(preload("res://audio/knight_step_1.wav"))
 			Shift.complete_task("sword")
-			brenda("He took it. Did he say thank you? He never says thank you.", 4.0)
+			brenda("He took it. Did he say thank you? He never says thank you. Raised in a forge.", 4.0)
 			return true
 	return false
+
+
+func tick(_delta: float) -> void:
+	if Shift.power_on and Music.base == "blackout":
+		Music.set_base("tense")
+		automaton().drain = 1.2 if Shift.hour < 5 else 2.2
+	if Shift.is_task_active("teaparty") and player.current_room == "toyroom":
+		Shift.complete_task("teaparty")
+		brenda("There they are. Five dolls, six cups. Remember: they only move when you're not looking. So... look.", 5.0)
+	var a := automaton()
+	if a.enabled:
+		hud.set_meter("LITTLE WOLFGANG'S SPRING" if not a.is_hunting() else "WOLFGANG IS LOOSE", a.spring, true)
+	else:
+		hud.set_meter("", 0.0, false)
 
 
 func on_hour(h: int, silent: bool) -> void:
@@ -112,19 +166,21 @@ func on_hour(h: int, silent: bool) -> void:
 			knight().activate()
 			automaton().set_enabled(true)
 			automaton().drain = 1.2
+			for d in dolls():
+				d.active = true
 			if not silent:
-				brenda("Wolfgang's spring is running. I'll keep an eye on him from here. You keep a hand on him.", 5.0)
+				brenda("Wolfgang's spring is running. And the dolls upstairs are... awake. Don't go in there without looking.", 5.0)
 		2:
 			if not silent:
 				_drop_sword(true)
 			elif Shift.is_task_active("sword"):
-				_drop_sword(false) # resuming from the checkpoint: put the sword back out
+				_drop_sword(false)
 		3:
 			Music.set_base("blackout")
 			Shift.set_power(false)
 			automaton().drain = 1.6
-			Shift.add_task("breaker", "Power is out! Flip the main breaker in Storage")
-			brenda("Power's out again. The breaker hates me personally. Storage, please.", 4.5)
+			Shift.add_task("breaker", "Power is out! Flip the main breaker in the basement boiler room")
+			brenda("Power's out again. The breaker hates me personally. Basement, please. Mind the stairs. Mind everything.", 5.0)
 		4:
 			Music.set_base("tense")
 			knight().speed = 2.6
@@ -133,18 +189,6 @@ func on_hour(h: int, silent: bool) -> void:
 		5:
 			automaton().drain = 2.2
 			brenda("Wolfgang's getting impatient. Wind him more often. MUCH more often.", 4.5)
-
-
-func tick(_delta: float) -> void:
-	if Shift.power_on and Music.base == "blackout":
-		Music.set_base("tense")
-		automaton().drain = 1.2 if Shift.hour < 5 else 2.2
-	var a := automaton()
-	if a.enabled:
-		var text := "LITTLE WOLFGANG'S SPRING" if not a.is_hunting() else "WOLFGANG IS LOOSE"
-		hud.set_meter(text, a.spring, true)
-	else:
-		hud.set_meter("", 0.0, false)
 
 
 func finish() -> void:
@@ -159,7 +203,7 @@ func _drop_sword(announce: bool) -> void:
 		Shift.add_task("sword", "Sir Clanksworth dropped his sword. Find it and give it back to him")
 		brenda("Sir Clanksworth dropped his sword. He won't stop clanking until he gets it back.", 5.0)
 	var spots: Array = museum.get_node("DuckSpots").get_children()
-	var spot: Node3D = spots[randi() % spots.size()]
+	var spot: Node3D = spots[randi() % 5]
 	_sword = game._pickup("Sword", "sword", "Take the sword", spot.global_position)
 	var blade := MeshInstance3D.new()
 	var m := BoxMesh.new()
@@ -201,3 +245,12 @@ func _restore_bulbs() -> void:
 		if s:
 			s.active = false
 			_light_socket(s)
+
+
+func _restore_items() -> void:
+	if flag("camera", false):
+		player.has_camera = true
+		player.film = maxi(player.film, 2)
+		var c := museum.get_node_or_null("Interactables/CameraPickup")
+		if c:
+			c.queue_free()

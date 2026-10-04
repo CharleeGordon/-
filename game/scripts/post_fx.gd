@@ -6,6 +6,7 @@ var _flash := 0.0
 
 
 func _ready() -> void:
+	add_to_group("post_fx")
 	layer = 5
 	var rect := ColorRect.new()
 	rect.set_anchors_preset(Control.PRESET_FULL_RECT)

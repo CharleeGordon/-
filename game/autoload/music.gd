@@ -12,7 +12,8 @@ extends Node
 const TRACKS := {
 	"menu": "menu_theme", "calm": "explore_calm", "tense": "explore_tense", "danger": "danger_near",
 	"chase": "chase", "blackout": "blackout", "storm": "duchess_theme", "finale": "finale",
-	"dawn": "dawn", "credits": "credits", "silence": "",
+	"dawn": "dawn", "credits": "credits", "silence": "", "upper": "upper_floor", "basement": "basement",
+	"brenda": "brenda_theme", "pemberton": "pemberton_chase",
 }
 const ONE_SHOT := ["dawn", "credits"]
 const FADE_FAST := 0.5
@@ -113,6 +114,13 @@ func set_safe(on: bool) -> void:
 	in_safe = on
 
 
+## Which floor the player is on (-1 basement, 0 ground, 1 upper). Floors have their own mood
+## that replaces the calm/tense night mood (blackout, storm and the finale still win).
+var floor_level := 0
+func set_floor(lvl: int) -> void:
+	floor_level = lvl
+
+
 func reset_reports() -> void:
 	_chase_t = 0.0
 	_danger_t = 0.0
@@ -138,6 +146,10 @@ func _process(delta: float) -> void:
 	var target_threat := 1.0 if _chase_t > 0.0 else (_danger_level if _danger_t > 0.0 else 0.0)
 	threat = move_toward(threat, target_threat, delta * (1.5 if target_threat > threat else 0.4))
 	var want := base
+	if (base == "calm" or base == "tense") and floor_level == 1:
+		want = "upper"
+	elif base != "finale" and floor_level == -1:
+		want = "basement"
 	if locked != "":
 		want = locked
 	elif _chase_t > 0.0:
@@ -208,6 +220,11 @@ func sting(name: String, volume_db: float = 0.0, duck_time: float = 1.5) -> void
 	free_player.volume_db = volume_db
 	free_player.play()
 	_duck_t = duck_time
+
+
+## Keep the music lowered (e.g. while a tape is playing).
+func duck_for(seconds: float) -> void:
+	_duck_t = maxf(_duck_t, seconds)
 
 
 func ui(name: String = "ui_click") -> void:

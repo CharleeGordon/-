@@ -28,7 +28,22 @@ GERALD  ...  A very shy Tyrannosaurus
 LITTLE WOLFGANG  ...  Clockwork, one song
 THE DUCHESS  ...  Disappointed
 GARY FINCH  ...  Night Guard, still technically employed
+THE TEA PARTY  ...  Five dolls, six cups
+SIR ARCHIBALD PEMBERTON  ...  Founder. Collector. Exhibit.
+LUCY HOLLOWAY  ...  The Director
 THE GOLDEN DUCK OF UR-QUACK  ...  The Duck
+
+
+~
+
+
+Placeholder voices
+Piper TTS, voice model "en_US-libritts-high"
+trained on the LibriTTS corpus (CC BY 4.0)
+Zen et al., "LibriTTS: A Corpus Derived from LibriSpeech for Text-to-Speech", 2019
+
+Fonts
+from Google Fonts, SIL Open Font License 1.1 (see fonts/OFL.txt)
 
 
 ~

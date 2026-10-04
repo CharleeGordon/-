@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Do Not Touch the Exhibits"
 config/description="First-person survival horror comedy. You are the night guard. The exhibits disagree."
-config/version="0.2.0"
+config/version="0.3.0"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
@@ -24,6 +24,10 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[gui]
+
+theme/custom_font="res://fonts/EBGaramond-Regular.woff2"
 
 [layer_names]
 

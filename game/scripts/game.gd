@@ -17,6 +17,8 @@ const DEATHS := {
 	"automaton": ["WOUND UP", "Little Wolfgang found you. He'd like you to wind HIM up next time.\nRule 7: keep him wound."],
 	"duchess": ["FRAMED", "You moved while the Duchess was watching. Your portrait will hang next to hers.\nRule 8: stand perfectly still."],
 	"guard": ["ESCORTED OUT", "Gary escorted you to the Wax Hall. Permanently.\nRule 9: stay out of his flashlight."],
+	"dolls": ["TEA PARTY", "The dolls poured you a cup. There is always one more cup.\nKeep your eyes on them in the Toy Room."],
+	"pemberton": ["ACQUIRED", "Sir Archibald added you to his collection. Exhibit #48: 'A Guard, Rather Startled.'\nThe camera flash stuns him. Use it."],
 }
 
 @onready var museum: Node3D = $Museum
@@ -33,6 +35,10 @@ var _coffee_cd := 0.0
 var _amb_timer := 12.0
 var _amb_one_shot: AudioStreamPlayer3D
 var _restoring := false
+var _scares: Array = []
+var _banter: Array = []
+var _banter_t := 75.0
+var _scare_cd := 0.0
 
 
 func _ready() -> void:
@@ -69,6 +75,11 @@ func _ready() -> void:
 
 	_spawn_batteries(night.battery_count())
 	_spawn_notes(night.note_ids())
+	_spawn_tapes(night.tape_ids())
+	_spawn_film(night.film_count())
+	_scares = night.scares()
+	_banter = night.banter()
+	_banter.shuffle()
 	night.setup(_restoring)
 	if _restoring:
 		for h in range(1, Shift.CHECKPOINT_HOUR):
@@ -95,6 +106,12 @@ func _process(delta: float) -> void:
 		return
 	_check_office_camping(delta)
 	_random_ambience(delta)
+	_check_scares(delta)
+	_banter_t -= delta
+	if _banter_t <= 0.0:
+		_banter_t = randf_range(80.0, 120.0)
+		if not _banter.is_empty() and not hud.is_tape_playing() and Shift.is_task_done("clock_in"):
+			night.brenda(_banter.pop_back(), 5.0)
 	night.tick(delta)
 
 
@@ -188,6 +205,120 @@ func _spawn_notes(ids: Array) -> void:
 		a.add_child(glow)
 
 
+func _spawn_tapes(ids: Array) -> void:
+	for id in ids:
+		var spot := museum.get_node_or_null("TapeSpots/Tape%d" % id)
+		if spot == null:
+			continue
+		var a := _pickup("TapeItem%d" % id, "tape_%d" % id, "Play tape: " + Tapes.title(id), spot.global_position)
+		var shell := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.1, 0.016, 0.064)
+		bm.material = preload("res://materials/black_plastic.tres")
+		shell.mesh = bm
+		shell.position = Vector3(0, 0.008, 0)
+		shell.rotation.y = randf_range(-0.8, 0.8)
+		a.add_child(shell)
+		var lab := MeshInstance3D.new()
+		var lm := BoxMesh.new()
+		lm.size = Vector3(0.08, 0.002, 0.035)
+		lm.material = preload("res://materials/e_amber.tres")
+		lab.mesh = lm
+		lab.position = Vector3(0, 0.017, 0)
+		shell.add_child(lab)
+		var glow := OmniLight3D.new()
+		glow.light_color = Color(1.0, 0.6, 0.25)
+		glow.light_energy = 0.35
+		glow.omni_range = 0.9
+		glow.position = Vector3(0, 0.2, 0)
+		a.add_child(glow)
+
+
+func _spawn_film(count: int) -> void:
+	var spots: Array = museum.get_node("FilmSpots").get_children()
+	spots.shuffle()
+	for i in mini(count, spots.size()):
+		var a := _pickup("Film%d" % i, "film", "Take a film pack", spots[i].global_position)
+		var box := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.1, 0.03, 0.1)
+		bm.material = preload("res://materials/toy_blue.tres")
+		box.mesh = bm
+		box.position = Vector3(0, 0.015, 0)
+		a.add_child(box)
+
+
+## One-off scripted scares: {room, hour, type, ...} - fires the first time the player enters the room late enough.
+func _check_scares(delta: float) -> void:
+	_scare_cd = maxf(_scare_cd - delta, 0.0)
+	if _scare_cd > 0.0 or player.is_safe():
+		return
+	for sc in _scares:
+		if sc.get("done", false):
+			continue
+		if player.current_room == sc["room"] and Shift.hour >= int(sc.get("hour", 0)):
+			sc["done"] = true
+			_scare_cd = 25.0
+			_play_scare(sc)
+			return
+
+
+func _play_scare(sc: Dictionary) -> void:
+	match sc["type"]:
+		"apparition":
+			var ghost: Node3D = museum.get_node_or_null("Apparition")
+			if ghost:
+				ghost.global_position = sc["pos"]
+				var d: Vector3 = player.global_position - ghost.global_position
+				ghost.rotation.y = atan2(-d.x, -d.z)
+				ghost.visible = true
+				for l in get_tree().get_nodes_in_group("flicker_lights"):
+					l.burst(1.4)
+				Music.sting("sting_knight", 0.0, 1.0)
+				get_tree().create_timer(1.3).timeout.connect(func() -> void: ghost.visible = false)
+		"lights":
+			var dark: Array = Shift.flags.get("dark_rooms", []).duplicate()
+			dark.append(player.current_room)
+			Shift.flags["dark_rooms"] = dark
+			apply_lights()
+			play_sfx(preload("res://audio/power_down.wav"), -6.0)
+			get_tree().create_timer(4.0).timeout.connect(func() -> void:
+				var d2: Array = Shift.flags.get("dark_rooms", [])
+				d2.erase(player.current_room)
+				Shift.flags["dark_rooms"] = d2
+				apply_lights())
+		"steps":
+			_amb_one_shot.stream = preload("res://audio/distant_steps_1.wav")
+			var back: Vector3 = player.camera.global_transform.basis.z
+			_amb_one_shot.global_position = player.global_position + back * 2.5 + Vector3(0, 0.5, 0)
+			_amb_one_shot.volume_db = 2.0
+			_amb_one_shot.play()
+		"slam":
+			play_sfx(preload("res://audio/locker_close.wav"), 4.0)
+			player.shake(0.5)
+			Music.sting("sting_knight", -4.0, 0.5)
+		"radio":
+			Shift.say(sc.get("text", "...give... it... back..."), "", 3.0)
+			play_sfx(preload("res://audio/radio_squelch.wav"), 0.0)
+			var v := AudioStreamPlayer.new()
+			var vs := Shift.voice_line(String(sc.get("voice", "")))
+			if vs:
+				v.stream = vs
+				v.bus = "Voice"
+				v.pitch_scale = 0.8
+				add_child(v)
+				v.play()
+				v.finished.connect(v.queue_free)
+		"giggle":
+			var g := AudioStreamPlayer3D.new()
+			g.stream = preload("res://audio/doll_giggle.wav")
+			g.bus = "SFX"
+			add_child(g)
+			g.global_position = sc.get("pos", player.global_position)
+			g.play()
+			g.finished.connect(g.queue_free)
+
+
 func _pickup(n: String, action: String, prompt: String, pos: Vector3) -> Interactable:
 	var a := Interactable.new()
 	a.name = n
@@ -230,6 +361,12 @@ func _on_interact(action: String, node: Node) -> void:
 		return
 	if night.handle(action, node):
 		return
+	if action.begins_with("tape_"):
+		var tid := int(action.trim_prefix("tape_"))
+		Save.add_tape(tid)
+		hud.play_tape(tid)
+		player.play_sfx(preload("res://audio/stamp.wav"), -12.0)
+		return
 	if action.begins_with("note_"):
 		var id := int(action.trim_prefix("note_"))
 		Save.add_note(id)
@@ -266,6 +403,28 @@ func _on_interact(action: String, node: Node) -> void:
 		"rules":
 			hud.open_journal()
 			Shift.complete_task("rules")
+		"film":
+			player.film += 2
+			node.queue_free()
+			player.play_sfx(preload("res://audio/pickup.wav"), -4.0)
+			Shift.alert.emit("Film pack: +2 photos." if player.has_camera else "A film pack. You'll need a camera for this.")
+		"take_ducks":
+			if player.ducks >= 3:
+				Shift.alert.emit("Your pockets are full of ducks. This is not a sentence you expected to hear tonight.")
+				return
+			player.ducks = 3
+			player.play_sfx(preload("res://audio/squeak.wav"), -6.0)
+			Shift.alert.emit("3 squeaky ducks. G (or middle mouse) to throw one. Exhibits go to look at the squeak.")
+		"vending":
+			player.play_sfx(preload("res://audio/stamp.wav"), -4.0)
+			var jokes := ["The machine eats your coin. It looks satisfied.", "A snack falls halfway, then stops. It's mocking you.", "OUT OF ORDER since 1987. It ate the order too.", "You receive a single, warm grape. Nobody knows why."]
+			Shift.alert.emit(jokes[randi() % jokes.size()])
+		"camera":
+			player.has_camera = true
+			player.film += 3
+			node.queue_free()
+			player.play_sfx(preload("res://audio/pickup.wav"), -2.0)
+			Shift.alert.emit("Instant camera! R (or right mouse) for a blinding flash. Museum photography is strictly forbidden. Use it anyway.")
 		"locked_door":
 			player.play_sfx(preload("res://audio/door_locked.wav"), -4.0)
 			Shift.alert.emit("Locked. 'Closed for renovation.'")

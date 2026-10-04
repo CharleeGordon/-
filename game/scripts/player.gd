@@ -40,10 +40,17 @@ var is_moving := false
 var is_hidden := false
 var hide_spot: Node = null
 var current_room := ""
+var current_level := 0
+var _room_levels := {}
 var carrying := "" # "duck", "bulbs", "sword"... (shown on the HUD)
 var carry_count := 0
 var controls_locked := false
 var focus: Interactable = null
+var has_camera := false
+var film := 0
+var ducks := 0
+var _flash_light: OmniLight3D
+var _flash_cd := 0.0
 
 var _rooms: Array[String] = []
 var _step_timer := 0.0
@@ -71,6 +78,12 @@ func _ready() -> void:
 			arr.append(load("res://audio/step_%s_%d.wav" % [s, i]))
 		_step_streams[s] = arr
 	breath.stream = _looping(preload("res://audio/breathing.ogg"))
+	_flash_light = OmniLight3D.new()
+	_flash_light.light_energy = 14.0
+	_flash_light.omni_range = 14.0
+	_flash_light.light_color = Color(0.95, 0.97, 1.0)
+	_flash_light.visible = false
+	camera.add_child(_flash_light)
 	heart.stream = preload("res://audio/heartbeat.wav")
 	camera.fov = float(Save.settings["fov"])
 	Save.settings_changed.connect(_on_settings)
@@ -116,12 +129,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("flashlight"):
 		toggle_flashlight()
+	elif event.is_action_pressed("camera_flash"):
+		take_photo()
+	elif event.is_action_pressed("throw"):
+		throw_duck()
 	elif event.is_action_pressed("interact") or event.is_action_pressed("interact_mouse"):
 		if focus and focus.active:
 			focus.interact(self)
 
 
 func _physics_process(delta: float) -> void:
+	_flash_cd = maxf(_flash_cd - delta, 0.0)
+	if not controls_locked or is_hidden:
+		_gamepad_look(delta)
 	if is_hidden:
 		_update_flashlight(delta)
 		_update_threat_audio(delta)
@@ -166,6 +186,92 @@ func _physics_process(delta: float) -> void:
 	_update_flashlight(delta)
 	_update_focus()
 	_update_threat_audio(delta)
+
+
+func _gamepad_look(delta: float) -> void:
+	var look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
+	if look.length() < 0.15:
+		return
+	var sens := 2.6 * float(Save.settings["mouse_sens"]) * delta
+	var dy := look.y * (-1.0 if bool(Save.settings["invert_y"]) else 1.0)
+	if is_hidden:
+		head.rotation.y = clampf(head.rotation.y - look.x * sens, -0.6, 0.6)
+		head.rotation.x = clampf(head.rotation.x - dy * sens, -0.4, 0.3)
+		return
+	rotate_y(-look.x * sens)
+	head.rotation.x = clampf(head.rotation.x - dy * sens, deg_to_rad(-85), deg_to_rad(85))
+
+
+## Instant camera: a blinding flash that stuns most exhibits for a few seconds.
+func take_photo() -> void:
+	if not has_camera:
+		return
+	if _flash_cd > 0.0:
+		return
+	if film <= 0:
+		Shift.alert.emit("Out of film. There's more lying around the museum.")
+		return
+	film -= 1
+	_flash_cd = 1.2
+	play_sfx(preload("res://audio/camera_flash.wav"), 0.0)
+	_flash_light.visible = true
+	get_tree().create_timer(0.12).timeout.connect(func() -> void: _flash_light.visible = false)
+	var post = get_tree().get_first_node_in_group("post_fx")
+	if post:
+		post.flash(Color(1, 1, 1), 0.8)
+	var origin := camera.global_position
+	var fwd := -camera.global_transform.basis.z
+	for e in get_tree().get_nodes_in_group("stunnable"):
+		if not e.visible:
+			continue
+		var p: Vector3 = e.global_position + Vector3(0, 1.0, 0)
+		if origin.distance_to(p) < 14.0 and rad_to_deg(fwd.angle_to(p - origin)) < 40.0 and has_line_of_sight(p):
+			e.stun(4.5)
+	var knight := get_tree().get_first_node_in_group("knight")
+	if knight and origin.distance_to(knight.global_position) < 12.0 and rad_to_deg(fwd.angle_to(knight.global_position + Vector3(0, 1.2, 0) - origin)) < 40.0:
+		Shift.say("Sir Clanksworth strikes a pose. He loves the attention. He keeps coming.", "", 3.5)
+	var dino := get_tree().get_first_node_in_group("dino")
+	if dino and dino.enabled:
+		var eye: Vector3 = dino.eye_point.global_position
+		if origin.distance_to(eye) < 16.0 and rad_to_deg(fwd.angle_to(eye - origin)) < 40.0 and has_line_of_sight(eye):
+			dino.flash_photo(self)
+
+
+func throw_duck() -> void:
+	if ducks <= 0:
+		Shift.alert.emit("No squeaky ducks. The gift shop is in the lobby.")
+		return
+	ducks -= 1
+	var d := RigidBody3D.new()
+	d.set_script(preload("res://scripts/world/squeaky_duck.gd"))
+	d.collision_layer = 0
+	d.collision_mask = 1 | 16
+	d.mass = 0.2
+	var cs := CollisionShape3D.new()
+	var sh := SphereShape3D.new()
+	sh.radius = 0.07
+	cs.shape = sh
+	d.add_child(cs)
+	var body := MeshInstance3D.new()
+	var bm := SphereMesh.new()
+	bm.radius = 0.07
+	bm.height = 0.12
+	bm.material = preload("res://materials/toy_yellow.tres")
+	body.mesh = bm
+	d.add_child(body)
+	var headm := MeshInstance3D.new()
+	var hm := SphereMesh.new()
+	hm.radius = 0.04
+	hm.height = 0.08
+	hm.material = preload("res://materials/toy_yellow.tres")
+	headm.mesh = hm
+	headm.position = Vector3(0, 0.07, -0.04)
+	d.add_child(headm)
+	get_tree().current_scene.add_child(d)
+	var fwd := -camera.global_transform.basis.z
+	d.global_position = camera.global_position + fwd * 0.5
+	d.linear_velocity = fwd * 11.0 + Vector3.UP * 2.5 + velocity * 0.5
+	d.angular_velocity = Vector3(randf_range(-8, 8), randf_range(-8, 8), randf_range(-8, 8))
 
 
 func _regen_stamina(delta: float) -> void:
@@ -349,18 +455,23 @@ func is_safe() -> bool:
 	return current_room == "office" and not is_hidden
 
 
-func enter_room(id: String) -> void:
+func enter_room(id: String, lvl: int = 0) -> void:
 	_rooms.erase(id)
 	_rooms.append(id)
+	_room_levels[id] = lvl
 	current_room = id
+	current_level = lvl
 	Music.set_safe(id == "office")
+	Music.set_floor(lvl)
 
 
 func exit_room(id: String) -> void:
 	_rooms.erase(id)
 	if not _rooms.is_empty():
 		current_room = _rooms.back()
+		current_level = _room_levels.get(current_room, 0)
 	Music.set_safe(current_room == "office")
+	Music.set_floor(current_level)
 
 
 # --- Hiding --------------------------------------------------------------

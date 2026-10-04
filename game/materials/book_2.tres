@@ -1,0 +1,6 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[resource]
+resource_name = "book_2"
+albedo_color = Color(0.12, 0.25, 0.12, 1)
+roughness = 0.75

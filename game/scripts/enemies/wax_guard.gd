@@ -25,6 +25,7 @@ var _saw_hide_spot: Node = null
 func _ready() -> void:
 	super._ready()
 	add_to_group("guards")
+	add_to_group("stunnable")
 	step_sounds = [preload("res://audio/boot_step_1.wav"), preload("res://audio/boot_step_2.wav"), preload("res://audio/boot_step_3.wav")]
 	_whistle = make_3d_sound(null, 7.0, -3.0)
 	var w: AudioStreamOggVorbis = preload("res://audio/music/gary_whistle.ogg").duplicate()
@@ -38,6 +39,17 @@ func _ready() -> void:
 			_points.append(m.global_position)
 	Shift.noise.connect(_on_noise)
 	_set_beam(false)
+
+
+var _stun := 0.0
+
+
+func stun(t: float) -> void:
+	_stun = t
+	if state == State.CHASE or state == State.ALERT:
+		state = State.SEARCH
+		_timer = t + 2.0
+	_gary_say("ARGH! My eyes! My... wax eyes!", preload("res://audio/babble_gary_2.wav"))
 
 
 func set_enabled(on: bool) -> void:
@@ -65,7 +77,8 @@ func _on_noise(pos: Vector3, radius: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not enabled or not Shift.running or not find_player() or not nav_ready() or _points.is_empty():
+	_stun = maxf(_stun - delta, 0.0)
+	if not enabled or not Shift.running or not find_player() or not nav_ready() or _points.is_empty() or _stun > 0.0:
 		stand_still(delta)
 		return
 	var sees := _sees_player()
@@ -138,9 +151,15 @@ func _alert() -> void:
 	state = State.ALERT
 	_timer = 0.7
 	_whistle.stop()
-	_voice.stream = [preload("res://audio/babble_gary_1.wav"), preload("res://audio/babble_gary_2.wav"), preload("res://audio/babble_gary_3.wav")][randi() % 3]
+	_gary_say(["HEY! Museum's closed, pal!", "Sir? Sir! The museum is CLOSED!", "Hold it right there! I'm... I'm security!"][randi() % 3],
+		[preload("res://audio/babble_gary_1.wav"), preload("res://audio/babble_gary_2.wav"), preload("res://audio/babble_gary_3.wav")][randi() % 3])
+
+
+func _gary_say(text: String, fallback: AudioStream) -> void:
+	var v := Shift.voice_line(text)
+	_voice.stream = v if v else fallback
 	_voice.play()
-	Shift.say("HEY! Museum's closed, pal!", "GARY", 2.5)
+	Shift.say(text, "GARY", 2.5)
 
 
 func _hear_footsteps() -> void:

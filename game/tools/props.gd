@@ -121,6 +121,30 @@ func _make_materials() -> void:
 	flat_mat("e_dino_eye", Color(1.0, 0.6, 0.15), 0.5, 0.0, 1.0)
 	flat_mat("e_screen", Color(0.35, 0.55, 0.5), 0.3, 0.0, 1.6)
 	flat_mat("e_amber", Color(1.0, 0.55, 0.1), 0.5, 0.0, 4.0)
+	tex_mat("fur", "velvet", 3.0, {"world": false, "tint": Color(0.9, 0.55, 0.35), "normal": 2.0})
+	tex_mat("copper", "gold", 2.0, {"world": false, "metallic": 0.85, "tint": Color(0.85, 0.45, 0.3)})
+	tex_mat("sheet", "linen", 1.2, {"world": false, "tint": Color(1.25, 1.25, 1.2)})
+	tex_mat("plaster_red", "plaster", 0.3, {"tint": Color(0.75, 0.42, 0.38)})
+	tex_mat("plaster_dark", "plaster", 0.3, {"tint": Color(0.32, 0.3, 0.34)})
+	tex_mat("brick", "sandstone", 0.35, {"tint": Color(0.75, 0.45, 0.35)})
+	flat_mat("mirror", Color(0.9, 0.92, 0.95), 0.02, 1.0)
+	flat_mat("toy_red", Color(0.75, 0.08, 0.06), 0.4)
+	flat_mat("toy_blue", Color(0.1, 0.2, 0.7), 0.4)
+	flat_mat("toy_yellow", Color(0.9, 0.7, 0.1), 0.4)
+	flat_mat("e_furnace", Color(1.0, 0.4, 0.08), 0.5, 0.0, 7.0)
+	flat_mat("e_star", Color(0.85, 0.9, 1.0), 0.5, 0.0, 6.0)
+	var book_colors := [Color(0.35, 0.08, 0.06), Color(0.08, 0.18, 0.3), Color(0.12, 0.25, 0.12), Color(0.38, 0.28, 0.12), Color(0.22, 0.1, 0.25), Color(0.4, 0.36, 0.3)]
+	for i in 6:
+		flat_mat("book_%d" % i, book_colors[i], 0.75)
+	var dome := StandardMaterial3D.new()
+	dome.albedo_color = Color(0.02, 0.02, 0.03)
+	dome.emission_enabled = true
+	dome.emission_texture = _tex("dome_stars")
+	dome.emission = Color.WHITE
+	dome.emission_energy_multiplier = 1.4
+	dome.cull_mode = BaseMaterial3D.CULL_DISABLED
+	dome.roughness = 1.0
+	_save(dome, "dome")
 	var glass := StandardMaterial3D.new()
 	glass.resource_name = "glass"
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -137,7 +161,7 @@ func _make_materials() -> void:
 	specimen.emission_enabled = true
 	specimen.emission = Color(0.2, 0.35, 0.1)
 	_save(specimen, "specimen_liquid")
-	for p in ["painting_man", "painting_duchess", "painting_pear", "painting_landscape", "painting_night", "painting_founder", "painting_lady", "painting_hills"]:
+	for p in ["painting_man", "painting_duchess", "painting_pear", "painting_landscape", "painting_night", "painting_founder", "painting_lady", "painting_hills", "photo_brenda"]:
 		var pm := StandardMaterial3D.new()
 		pm.albedo_texture = _tex(p)
 		pm.roughness = 0.55
@@ -162,6 +186,13 @@ func part(parent: Node3D, name: String, mesh: Mesh, pos: Vector3 = Vector3.ZERO,
 	mi.scale = scale
 	parent.add_child(mi)
 	return mi
+
+
+func attach(parent: Node3D, child: Node3D, pos: Vector3 = Vector3.ZERO, rot_deg: Vector3 = Vector3.ZERO) -> Node3D:
+	child.position = pos
+	child.rotation_degrees = rot_deg
+	parent.add_child(child)
+	return child
 
 
 func cached(key: String, maker: Callable) -> Mesh:
@@ -276,11 +307,11 @@ func rope(a: Vector3, b: Vector3, sag: float = 0.18) -> Node3D:
 	return root
 
 
-func chandelier() -> Node3D:
+func chandelier(chain: float = 1.0) -> Node3D:
 	var root := node("Chandelier")
-	part(root, "Chain", cyl(0.012, 0.012, 1.0, "brass", 6), Vector3(0, -1.0, 0))
+	part(root, "Chain", cyl(0.012, 0.012, chain, "brass", 6), Vector3(0, -chain, 0))
 	part(root, "Body", cached("chand_body", func() -> Mesh:
-		return ML.lathe(ML.prof([0.0, -0.5, 0.06, -0.48, 0.12, -0.35, 0.08, -0.2, 0.14, -0.1, 0.05, 0.0, 0.0, 0.0]), M["brass"], {"segments": 18})), Vector3(0, -1.0, 0))
+		return ML.lathe(ML.prof([0.0, -0.5, 0.06, -0.48, 0.12, -0.35, 0.08, -0.2, 0.14, -0.1, 0.05, 0.0, 0.0, 0.0]), M["brass"], {"segments": 18})), Vector3(0, -chain, 0))
 	var arm := cached("chand_arm", func() -> Mesh:
 		var pts := PackedVector3Array()
 		for i in 9:
@@ -295,7 +326,7 @@ func chandelier() -> Node3D:
 		var a := TAU * k / 8.0
 		var pivot := node("Arm%d" % k)
 		pivot.rotation.y = a
-		pivot.position = Vector3(0, -1.0, 0)
+		pivot.position = Vector3(0, -chain, 0)
 		root.add_child(pivot)
 		part(pivot, "Arm", arm)
 		part(pivot, "Cup", cup, Vector3(0.55, -0.2, 0))
@@ -735,6 +766,8 @@ func wax_figure(style: Dictionary) -> Node3D:
 			part(head, "Visor", bbox(Vector3(0.16, 0.012, 0.08), 0.004, "black_plastic"), Vector3(0, 0.205, -0.12), Vector3(-10, 0, 0))
 		"tricorn":
 			part(head, "Hat", ML.lathe(ML.prof([0.0, 0.2, 0.18, 0.21, 0.1, 0.24, 0.09, 0.32, 0.0, 0.33]), M["cloth_black"], {"segments": 3}), Vector3.ZERO, Vector3(0, 30, 0))
+		"tophat":
+			part(head, "Hat", ML.lathe(ML.prof([0.0, 0.2, 0.17, 0.2, 0.17, 0.215, 0.1, 0.22, 0.105, 0.42, 0.0, 0.42]), M["cloth_black"], {"segments": 18, "scale_z": 1.1}))
 		"bicorne":
 			part(head, "Hat", ML.lathe(ML.prof([0.0, 0.2, 0.2, 0.22, 0.05, 0.38, 0.0, 0.38]), M["cloth_black"], {"segments": 12, "scale_z": 0.3}), Vector3.ZERO, Vector3(0, 90, 0))
 	if style.get("dress", false):
@@ -840,4 +873,406 @@ func dino_skeleton() -> Node3D:
 	# Steel support armature
 	for x in [-1.3, 0.6, 2.4]:
 		part(root, "Support", cyl(0.025, 0.025, 2.6, "steel_dark", 8), Vector3(x, 0.0, 0))
+	return root
+
+
+# ------------------------------------------------------------ v0.3 props ---
+
+func stairs(width: float, run: float, rise: float, mat_key: String = "marble") -> Node3D:
+	## Straight staircase going from (0,0,0) up to (0, rise, -run). Steps + sloped underside + stringers.
+	var root := node("Stairs")
+	var steps := maxi(4, int(round(rise / 0.17)))
+	var tread := run / steps
+	var riser := rise / steps
+	var step_mesh := bbox(Vector3(width, riser + 0.03, tread + 0.03), 0.01, mat_key)
+	for i in steps:
+		part(root, "Step", step_mesh, Vector3(0, riser * (i + 0.5), -tread * (i + 0.5)))
+	var length := sqrt(run * run + rise * rise)
+	var ang := rad_to_deg(atan2(rise, run))
+	part(root, "Under", bbox(Vector3(width, 0.25, length), 0.01, "plaster_white"), Vector3(0, rise / 2.0 - 0.15, -run / 2.0), Vector3(ang, 0, 0))
+	for sx in [-1, 1]:
+		part(root, "Stringer", bbox(Vector3(0.1, 0.45, length + 0.2), 0.02, "dark_wood_obj"), Vector3(sx * (width / 2.0 + 0.05), rise / 2.0 + 0.05, -run / 2.0), Vector3(ang, 0, 0))
+		# Balusters + handrail
+		var n := int(length / 0.45)
+		for k in n:
+			var t := (k + 0.5) / n
+			var base := Vector3(sx * (width / 2.0 + 0.05), rise * t + 0.2, -run * t)
+			part(root, "Baluster", baluster(), base)
+		var a := Vector3(sx * (width / 2.0 + 0.05), 1.15, 0.0)
+		var b := Vector3(sx * (width / 2.0 + 0.05), rise + 1.15, -run)
+		part(root, "Handrail", ML.tube(PackedVector3Array([a, b]), [0.035], M["dark_wood_obj"], {"sides": 8}))
+	return root
+
+
+func baluster() -> Mesh:
+	return cached("baluster", func() -> Mesh:
+		return ML.lathe(ML.prof([0.0, 0.0, 0.035, 0.0, 0.035, 0.06, 0.022, 0.12, 0.03, 0.35, 0.02, 0.55, 0.028, 0.8, 0.02, 0.9, 0.03, 0.95, 0.0, 0.95]), M["dark_wood_obj"], {"segments": 10}))
+
+
+func railing(a: Vector3, b: Vector3) -> Node3D:
+	## Balustrade from a to b (floor level points).
+	var root := node("Railing")
+	var length := a.distance_to(b)
+	var n := maxi(1, int(length / 0.3))
+	for k in n + 1:
+		part(root, "Baluster", baluster(), a.lerp(b, float(k) / n))
+	part(root, "Rail", ML.tube(PackedVector3Array([a + Vector3(0, 0.98, 0), b + Vector3(0, 0.98, 0)]), [0.045], M["dark_wood_obj"], {"sides": 8, "caps": true}))
+	part(root, "Base", ML.tube(PackedVector3Array([a + Vector3(0, 0.03, 0), b + Vector3(0, 0.03, 0)]), [0.04], M["dark_wood_obj"], {"sides": 6}))
+	return root
+
+
+func bookshelf(w: float, h: float, seed: int) -> Node3D:
+	## Tall bookcase facing +Z, filled with books (merged into one mesh).
+	var root := node("Bookshelf")
+	var d := 0.4
+	part(root, "Back", bbox(Vector3(w, h, 0.03), 0.004, "dark_wood_obj"), Vector3(0, h / 2.0, -d / 2.0 + 0.015))
+	for sx in [-1, 1]:
+		part(root, "Side", bbox(Vector3(0.04, h, d), 0.006, "dark_wood_obj"), Vector3(sx * (w / 2.0 - 0.02), h / 2.0, 0))
+	part(root, "Crown", bbox(Vector3(w + 0.1, 0.08, d + 0.06), 0.02, "dark_wood_obj"), Vector3(0, h, 0))
+	var shelves := int(h / 0.38)
+	var r := RandomNumberGenerator.new()
+	r.seed = seed
+	var parts := []
+	for i in shelves:
+		var y := 0.08 + i * (h - 0.16) / shelves
+		part(root, "Board", bbox(Vector3(w - 0.06, 0.025, d - 0.04), 0.004, "dark_wood_obj"), Vector3(0, y, 0))
+		var x := -w / 2.0 + 0.06
+		while x < w / 2.0 - 0.1:
+			var bw := r.randf_range(0.025, 0.06)
+			var bh := r.randf_range(0.22, 0.32)
+			if r.randf() < 0.06:
+				x += 0.08
+				continue
+			var tilt := 0.0 if r.randf() > 0.08 else r.randf_range(-12, 12)
+			var mesh := bbox(Vector3(bw, bh, r.randf_range(0.2, 0.28)), 0.006, "book_%d" % r.randi_range(0, 5))
+			var xf := Transform3D(Basis(Vector3.BACK, deg_to_rad(tilt)), Vector3(x + bw / 2.0, y + 0.013 + bh / 2.0, 0.0))
+			parts.append([mesh, xf])
+			x += bw + 0.003
+	part(root, "Books", ML.merge(parts))
+	return root
+
+
+func reading_desk() -> Node3D:
+	var root := node("ReadingDesk")
+	part(root, "Top", bbox(Vector3(1.6, 0.06, 0.8), 0.015, "dark_wood_obj"), Vector3(0, 0.76, 0))
+	part(root, "Leather", bbox(Vector3(1.2, 0.01, 0.5), 0.004, "cloth_green"), Vector3(0, 0.795, 0))
+	for sx in [-1, 1]:
+		for sz in [-1, 1]:
+			part(root, "Leg", cyl(0.04, 0.03, 0.73, "dark_wood_obj", 8), Vector3(sx * 0.7, 0, sz * 0.32))
+	attach(root, desk_lamp(), Vector3(0.5, 0.79, -0.15))
+	part(root, "Book", bbox(Vector3(0.3, 0.05, 0.22), 0.008, "book_0"), Vector3(-0.3, 0.82, 0.05), Vector3(0, 20, 0))
+	return root
+
+
+func dome(radius: float) -> Node3D:
+	var root := node("Dome")
+	part(root, "Shell", ML.lathe(ML.curve(func(t: float) -> Vector2: return Vector2(cos(t * PI * 0.5) * radius, sin(t * PI * 0.5) * radius), 14), M["dome"], {"segments": 40, "uv_u": 1.0, "uv_v": 1.0 / radius, "sharp": 80.0}))
+	part(root, "Rim", ML.lathe(ML.prof([radius + 0.02, -0.15, radius + 0.25, -0.15, radius + 0.25, 0.05, radius + 0.02, 0.05]), M["brass"], {"segments": 40}))
+	return root
+
+
+func star_projector() -> Node3D:
+	var root := node("Projector")
+	part(root, "Base", ML.lathe(ML.prof([0.0, 0.0, 0.45, 0.0, 0.4, 0.15, 0.12, 0.3, 0.1, 1.2, 0.0, 1.2]), M["steel_dark"], {"segments": 18}))
+	for s in [-1, 1]:
+		part(root, "Globe", sphere(0.32, "brass", 12), Vector3(s * 0.55, 1.45, 0))
+		part(root, "Lens", sphere(0.07, "e_star"), Vector3(s * 0.75, 1.55, 0.15))
+	part(root, "Bar", cyl(0.06, 0.06, 1.1, "steel_dark", 10), Vector3(-0.55, 1.45, 0), Vector3(0, 0, -90))
+	return root
+
+
+func bear() -> Node3D:
+	## Mr. Snuggles, taxidermy grizzly, standing on hind legs, arms raised. Faces -Z.
+	var root := node("Bear")
+	part(root, "Body", ML.lathe(ML.curve(func(t: float) -> Vector2: return Vector2(sin(t * PI) * (0.45 - 0.1 * t), t * 1.6), 12), M["fur"], {"segments": 16, "noise": 0.12, "seed": 3}), Vector3(0, 0.55, 0))
+	part(root, "Head", sphere(0.28, "fur"), Vector3(0, 2.2, -0.05), Vector3.ZERO, Vector3(1, 0.95, 1.1))
+	part(root, "Snout", sphere(0.14, "fur"), Vector3(0, 2.15, -0.3), Vector3.ZERO, Vector3(0.8, 0.7, 1.2))
+	part(root, "Nose", sphere(0.05, "eye_dark"), Vector3(0, 2.2, -0.45))
+	for sx in [-1, 1]:
+		part(root, "Ear", sphere(0.08, "fur"), Vector3(sx * 0.2, 2.45, 0.0))
+		part(root, "Eye", sphere(0.025, "e_amber"), Vector3(sx * 0.1, 2.3, -0.28))
+		part(root, "Leg", limb(0.6, 0.17, 0.14, "fur", 0.1), Vector3(sx * 0.22, 0.65, 0))
+		part(root, "Arm", ML.tube(PackedVector3Array([Vector3(sx * 0.35, 1.8, 0), Vector3(sx * 0.6, 2.2, -0.2), Vector3(sx * 0.7, 2.55, -0.3)]), [0.13, 0.11, 0.09], M["fur"], {"sides": 8, "noise": 0.1}))
+		for c in 3:
+			part(root, "Claw", cyl(0.015, 0.0, 0.12, "bone", 5), Vector3(sx * (0.66 + c * 0.03), 2.62, -0.35), Vector3(-40, 0, 0))
+	return root
+
+
+func deer() -> Node3D:
+	var root := node("Deer")
+	part(root, "Body", sphere(0.4, "fur"), Vector3(0, 1.05, 0), Vector3.ZERO, Vector3(0.75, 0.75, 1.6))
+	part(root, "Neck", ML.tube(PackedVector3Array([Vector3(0, 1.2, -0.5), Vector3(0, 1.55, -0.65)]), [0.13, 0.1], M["fur"], {"sides": 8}))
+	part(root, "Head", sphere(0.12, "fur"), Vector3(0, 1.65, -0.78), Vector3.ZERO, Vector3(0.8, 0.8, 1.5))
+	for sx in [-1, 1]:
+		for sz in [-0.45, 0.45]:
+			part(root, "Leg", limb(0.85, 0.05, 0.03, "fur"), Vector3(sx * 0.15, 0.9, sz))
+		var base := Vector3(sx * 0.06, 1.75, -0.72)
+		part(root, "Antler", ML.tube(PackedVector3Array([base, base + Vector3(sx * 0.15, 0.25, 0.05), base + Vector3(sx * 0.3, 0.45, 0.15)]), [0.02, 0.015, 0.008], M["bone"], {"sides": 5}))
+		part(root, "Tine", ML.tube(PackedVector3Array([base + Vector3(sx * 0.15, 0.25, 0.05), base + Vector3(sx * 0.12, 0.42, -0.08)]), [0.012, 0.005], M["bone"], {"sides": 5}))
+		part(root, "Eye", sphere(0.015, "eye_dark"), Vector3(sx * 0.07, 1.7, -0.86))
+	return root
+
+
+func owl() -> Node3D:
+	var root := node("Owl")
+	part(root, "Perch", cyl(0.03, 0.03, 1.4, "dark_wood_obj", 8))
+	part(root, "Body", sphere(0.14, "fur"), Vector3(0, 1.6, 0), Vector3.ZERO, Vector3(1, 1.3, 0.9))
+	part(root, "Head", sphere(0.1, "fur"), Vector3(0, 1.85, 0))
+	for sx in [-1, 1]:
+		part(root, "Eye", sphere(0.03, "e_amber"), Vector3(sx * 0.04, 1.87, -0.08))
+	return root
+
+
+func butterfly_case() -> Node3D:
+	var root := node("ButterflyCase")
+	part(root, "Frame", bbox(Vector3(1.0, 0.7, 0.06), 0.01, "dark_wood_obj"))
+	part(root, "Back", bbox(Vector3(0.9, 0.6, 0.01), 0.002, "sheet"), Vector3(0, 0, 0.031))
+	var r := RandomNumberGenerator.new()
+	r.seed = 9
+	for k in 12:
+		var c := "toy_%s" % ["red", "blue", "yellow"][k % 3]
+		part(root, "Wing", sphere(0.035, c), Vector3(-0.35 + (k % 4) * 0.23, -0.2 + (k / 4) * 0.2, 0.04), Vector3.ZERO, Vector3(1.6, 1.0, 0.1))
+	return root
+
+
+func weapon_rack() -> Node3D:
+	var root := node("WeaponRack")
+	part(root, "Frame", bbox(Vector3(1.6, 0.08, 0.3), 0.01, "dark_wood_obj"), Vector3(0, 0.1, 0))
+	part(root, "Top", bbox(Vector3(1.6, 0.08, 0.15), 0.01, "dark_wood_obj"), Vector3(0, 1.5, -0.08))
+	for k in 6:
+		var x := -0.65 + k * 0.26
+		part(root, "Shaft", cyl(0.018, 0.018, 2.0, "dark_wood_obj", 6), Vector3(x, 0.12, -0.05), Vector3(-3, 0, 0))
+		part(root, "Head", cyl(0.04, 0.0, 0.28, "metal", 4), Vector3(x, 2.1, -0.1), Vector3(0, 0, 0), Vector3(1, 1, 0.25))
+	return root
+
+
+func cannon() -> Node3D:
+	var root := node("Cannon")
+	part(root, "Barrel", ML.lathe(ML.prof([0.0, 0.0, 0.2, 0.0, 0.22, 0.08, 0.17, 0.3, 0.14, 1.5, 0.17, 1.6, 0.06, 1.62, 0.06, 1.55, 0.0, 1.55]), M["steel_dark"], {"segments": 18}), Vector3(0, 0.55, 0.6), Vector3(-80, 0, 0))
+	part(root, "Carriage", bbox(Vector3(0.5, 0.35, 1.2), 0.03, "dark_wood_obj"), Vector3(0, 0.35, 0.3))
+	for sx in [-1, 1]:
+		for z in [-0.05, 0.75]:
+			part(root, "Wheel", cyl(0.28, 0.28, 0.08, "dark_wood_obj", 14), Vector3(sx * 0.3, 0.28, z), Vector3(0, 0, 90))
+	return root
+
+
+func banner(color: String) -> Node3D:
+	var root := node("Banner")
+	part(root, "Pole", cyl(0.02, 0.02, 1.2, "brass", 6), Vector3(-0.6, 0, 0), Vector3(0, 0, -90))
+	part(root, "Cloth", ML.lathe(ML.prof([0.5, 0.0, 0.5, -1.6, 0.0, -2.0]), M[color], {"segments": 3, "scale_z": 0.02}), Vector3(0, -0.02, 0), Vector3(0, 90, 0))
+	return root
+
+
+func workbench() -> Node3D:
+	var root := node("Workbench")
+	part(root, "Top", bbox(Vector3(2.0, 0.08, 0.8), 0.01, "crate"), Vector3(0, 0.88, 0))
+	part(root, "Shelf", bbox(Vector3(1.9, 0.04, 0.7), 0.01, "crate"), Vector3(0, 0.25, 0))
+	for sx in [-1, 1]:
+		for sz in [-1, 1]:
+			part(root, "Leg", bbox(Vector3(0.07, 0.88, 0.07), 0.01, "crate"), Vector3(sx * 0.92, 0.44, sz * 0.33))
+	part(root, "Vise", bbox(Vector3(0.18, 0.12, 0.15), 0.02, "steel_dark"), Vector3(0.8, 0.98, 0.3))
+	part(root, "Hammer", bbox(Vector3(0.3, 0.03, 0.04), 0.008, "dark_wood_obj"), Vector3(0.2, 0.94, 0.1), Vector3(0, 30, 0))
+	part(root, "WaxHead", sphere(0.11, "wax"), Vector3(-0.5, 1.03, 0.0), Vector3.ZERO, Vector3(0.85, 1.1, 0.95))
+	part(root, "Can", cyl(0.07, 0.07, 0.16, "toy_red", 12), Vector3(-0.1, 0.92, -0.2))
+	return root
+
+
+func easel() -> Node3D:
+	var root := node("Easel")
+	for sx in [-1, 1]:
+		part(root, "Leg", cyl(0.02, 0.02, 1.8, "dark_wood_obj", 6), Vector3(sx * 0.3, 0, 0), Vector3(-8, 0, sx * 8))
+	part(root, "Back", cyl(0.02, 0.02, 1.7, "dark_wood_obj", 6), Vector3(0, 0, 0.35), Vector3(15, 0, 0))
+	attach(root, painting(0.7, 0.9, "painting_lady"), Vector3(0, 1.25, -0.08), Vector3(-8, 0, 0))
+	return root
+
+
+func sheet_statue(h: float, seed: int) -> Node3D:
+	var root := node("CoveredStatue")
+	part(root, "Sheet", ML.lathe(ML.curve(func(t: float) -> Vector2:
+		var r := 0.42 - 0.18 * t + 0.08 * sin(t * PI * 3.0)
+		if t > 0.82:
+			r *= (1.0 - (t - 0.82) * 4.0)
+		return Vector2(maxf(r, 0.0), t * h), 14), M["sheet"], {"segments": 14, "noise": 0.15, "seed": seed}))
+	return root
+
+
+func mannequin(style: Dictionary) -> Node3D:
+	var st := {"skin": "porcelain", "top": style.get("top", "cloth_red"), "legs": style.get("legs", "cloth_black"), "plain_head": true}
+	st.merge(style, true)
+	var m := humanoid(st)
+	if st["plain_head"]:
+		var head: Node3D = m.find_child("Head", true, false)
+		part(head, "Egg", sphere(0.1, "porcelain"), Vector3(0, 0.12, 0), Vector3.ZERO, Vector3(0.9, 1.25, 1.0))
+	if st.get("dress", false):
+		var hips: Node3D = m.find_child("Hips", true, false)
+		part(hips, "Dress", ML.lathe(ML.prof([0.17, 0.08, 0.2, -0.2, 0.32, -0.6, 0.42, -0.93, 0.0, -0.93]), M[st["top"]], {"segments": 18, "noise": 0.03}))
+	return m
+
+
+func clothes_rack() -> Node3D:
+	var root := node("ClothesRack")
+	for sx in [-1, 1]:
+		part(root, "Post", cyl(0.02, 0.02, 1.7, "metal", 6), Vector3(sx * 0.8, 0, 0))
+	part(root, "Bar", cyl(0.015, 0.015, 1.6, "metal", 6), Vector3(-0.8, 1.68, 0), Vector3(0, 0, -90))
+	var colors := ["cloth_red", "cloth_black", "cloth_green", "uniform", "sheet"]
+	for k in 7:
+		part(root, "Coat", ML.lathe(ML.prof([0.04, 0.0, 0.22, -0.15, 0.26, -0.9, 0.0, -0.9]), M[colors[k % colors.size()]], {"segments": 10, "scale_z": 0.25, "noise": 0.05, "seed": k}), Vector3(-0.65 + k * 0.21, 1.65, 0), Vector3(0, 90, 0))
+	return root
+
+
+func mirror(w: float, h: float) -> Node3D:
+	var root := node("Mirror")
+	var prof := ML.prof([0.0, 0.015, 0.03, 0.05, 0.08, 0.04, 0.1, 0.0])
+	part(root, "Frame", cached("mirror_frame_%s_%s" % [w, h], func() -> Mesh: return ML.frame(w, h, prof, M["gold"])))
+	part(root, "Glass", ML.plane(w, h, M["mirror"]), Vector3(0, 0, 0.012))
+	return root
+
+
+func filing_cabinet() -> Node3D:
+	var root := node("FilingCabinet")
+	part(root, "Body", bbox(Vector3(0.5, 1.3, 0.6), 0.01, "steel_dark"), Vector3(0, 0.65, 0))
+	for k in 4:
+		part(root, "Handle", bbox(Vector3(0.14, 0.02, 0.03), 0.005, "metal"), Vector3(0, 0.2 + k * 0.31, 0.31))
+	return root
+
+
+func dollhouse() -> Node3D:
+	var root := node("Dollhouse")
+	part(root, "House", bbox(Vector3(1.0, 0.8, 0.6), 0.01, "plaster_red"), Vector3(0, 0.4, 0))
+	part(root, "Roof", ML.lathe(ML.prof([0.0, 0.0, 0.75, 0.0, 0.0, 0.45]), M["dark_wood_obj"], {"segments": 4, "scale_z": 0.6}), Vector3(0, 0.8, 0), Vector3(0, 45, 0))
+	for k in 4:
+		part(root, "Window", bbox(Vector3(0.15, 0.15, 0.01), 0.002, "e_amber"), Vector3(-0.25 + (k % 2) * 0.5, 0.25 + (k / 2) * 0.35, 0.301))
+	return root
+
+
+func rocking_horse() -> Node3D:
+	var root := node("RockingHorse")
+	for sx in [-1, 1]:
+		part(root, "Rocker", ML.tube(PackedVector3Array([Vector3(sx * 0.18, 0.15, -0.6), Vector3(sx * 0.18, 0.02, 0.0), Vector3(sx * 0.18, 0.15, 0.6)]), [0.03], M["dark_wood_obj"], {"sides": 6}))
+	part(root, "Body", sphere(0.2, "porcelain"), Vector3(0, 0.6, 0), Vector3.ZERO, Vector3(0.8, 0.8, 1.8))
+	part(root, "Neck", cyl(0.1, 0.07, 0.4, "porcelain", 8), Vector3(0, 0.65, -0.3), Vector3(-30, 0, 0))
+	part(root, "Head", sphere(0.1, "porcelain"), Vector3(0, 1.0, -0.5), Vector3.ZERO, Vector3(0.8, 0.9, 1.6))
+	part(root, "Saddle", bbox(Vector3(0.3, 0.05, 0.3), 0.02, "toy_red"), Vector3(0, 0.78, 0))
+	for k in 4:
+		part(root, "Leg", cyl(0.04, 0.03, 0.45, "porcelain", 6), Vector3((k % 2 - 0.5) * 0.28, 0.15, (k / 2 - 0.5) * 0.6))
+	return root
+
+
+func toy_train() -> Node3D:
+	var root := node("ToyTrain")
+	var r := 1.2
+	part(root, "Track", ML.lathe(ML.prof([r - 0.06, 0.0, r + 0.06, 0.0, r + 0.06, 0.02, r - 0.06, 0.02]), M["steel_dark"], {"segments": 48}))
+	var train := node("Train")
+	root.add_child(train)
+	var colors := ["toy_red", "toy_blue", "toy_yellow", "toy_red"]
+	for k in 4:
+		var a := -k * 0.32
+		var car := node("Car%d" % k)
+		car.position = Vector3(cos(a) * r, 0.02, sin(a) * r)
+		car.rotation.y = -a
+		train.add_child(car)
+		part(car, "Box", bbox(Vector3(0.14, 0.12, 0.26), 0.02, colors[k]), Vector3(0, 0.08, 0))
+		if k == 0:
+			part(car, "Chimney", cyl(0.03, 0.04, 0.1, "steel_dark", 8), Vector3(0, 0.16, -0.08))
+	return root
+
+
+func music_box() -> Node3D:
+	var root := node("MusicBox")
+	part(root, "Box", bbox(Vector3(0.3, 0.15, 0.2), 0.02, "dark_wood_obj"), Vector3(0, 0.075, 0))
+	part(root, "Lid", bbox(Vector3(0.3, 0.02, 0.2), 0.008, "dark_wood_obj"), Vector3(0, 0.22, -0.1), Vector3(-70, 0, 0))
+	part(root, "Dancer", cyl(0.02, 0.05, 0.12, "porcelain", 8), Vector3(0, 0.15, 0))
+	part(root, "Head", sphere(0.02, "porcelain"), Vector3(0, 0.29, 0))
+	return root
+
+
+func boiler() -> Node3D:
+	var root := node("Boiler")
+	part(root, "Tank", ML.lathe(ML.prof([0.0, 0.0, 0.9, 0.0, 0.95, 0.1, 0.95, 2.4, 0.7, 2.8, 0.2, 2.9, 0.0, 2.9]), M["steel_dark"], {"segments": 24}))
+	for y in [0.5, 1.3, 2.1]:
+		part(root, "Band", ML.lathe(ML.prof([0.97, 0.0, 0.97, 0.08]), M["copper"], {"segments": 24}), Vector3(0, y, 0))
+	part(root, "Door", cyl(0.3, 0.3, 0.08, "steel_dark", 16), Vector3(0, 0.7, -0.95), Vector3(90, 0, 0))
+	part(root, "Glow", cyl(0.2, 0.2, 0.02, "e_furnace", 16), Vector3(0, 0.7, -1.0), Vector3(90, 0, 0))
+	part(root, "Gauge", cyl(0.12, 0.12, 0.04, "porcelain", 16), Vector3(0.5, 1.8, -0.8), Vector3(90, -30, 0))
+	part(root, "Flue", cyl(0.2, 0.2, 1.5, "steel_dark", 12), Vector3(0, 2.85, 0))
+	return root
+
+
+func pipe_run(a: Vector3, b: Vector3, r: float = 0.08) -> Node3D:
+	var root := node("Pipe")
+	part(root, "Pipe", ML.tube(PackedVector3Array([a, b]), [r], M["copper"], {"sides": 10, "caps": true}))
+	var n := int(a.distance_to(b) / 1.5)
+	for k in n:
+		part(root, "Flange", sphere(r * 1.35, "copper", 6), a.lerp(b, float(k + 1) / (n + 1)), Vector3.ZERO, Vector3(1.0, 1.0, 1.0))
+	return root
+
+
+func valve_wheel() -> Node3D:
+	var root := node("Valve")
+	part(root, "Wheel", ML.lathe(ML.prof([0.17, -0.015, 0.2, -0.015, 0.2, 0.015, 0.17, 0.015]), M["cloth_red"], {"segments": 18}), Vector3.ZERO, Vector3(90, 0, 0))
+	part(root, "Hub", cyl(0.03, 0.03, 0.08, "steel_dark", 8), Vector3(0, 0, -0.04), Vector3(90, 0, 0))
+	return root
+
+
+func generator() -> Node3D:
+	var root := node("Generator")
+	part(root, "Body", bbox(Vector3(1.6, 1.1, 0.9), 0.04, "toy_yellow"), Vector3(0, 0.55, 0))
+	part(root, "Engine", bbox(Vector3(0.9, 0.5, 0.7), 0.04, "steel_dark"), Vector3(-0.2, 1.3, 0))
+	part(root, "Exhaust", cyl(0.06, 0.06, 0.6, "steel_dark", 8), Vector3(0.5, 1.1, 0))
+	part(root, "Panel", bbox(Vector3(0.3, 0.25, 0.02), 0.01, "e_amber"), Vector3(0.55, 0.7, 0.46))
+	return root
+
+
+func candle() -> Node3D:
+	var root := node("Candle")
+	part(root, "Wax", cyl(0.035, 0.035, 0.22, "porcelain", 10))
+	part(root, "Flame", sphere(0.02, "e_furnace"), Vector3(0, 0.25, 0), Vector3.ZERO, Vector3(0.7, 1.6, 0.7))
+	return root
+
+
+func brazier() -> Node3D:
+	var root := node("Brazier")
+	part(root, "Bowl", ML.lathe(ML.prof([0.0, 0.0, 0.12, 0.0, 0.05, 0.6, 0.12, 0.7, 0.45, 0.95, 0.42, 1.0, 0.0, 0.92]), M["gold"], {"segments": 20}))
+	part(root, "Coals", cyl(0.38, 0.38, 0.04, "e_furnace", 18), Vector3(0, 0.93, 0))
+	return root
+
+
+func gold_pile(seed: int) -> Node3D:
+	var root := node("GoldPile")
+	var r := RandomNumberGenerator.new()
+	r.seed = seed
+	part(root, "Pile", ML.lathe(ML.curve(func(t: float) -> Vector2: return Vector2(cos(t * PI * 0.5) * 0.6, sin(t * PI * 0.5) * 0.3), 6), M["gold"], {"segments": 16, "noise": 0.2, "seed": seed}))
+	for k in 8:
+		part(root, "Coin", cyl(0.04, 0.04, 0.01, "gold", 10), Vector3(r.randf_range(-0.7, 0.7), 0.01, r.randf_range(-0.7, 0.7)), Vector3(r.randf_range(-20, 20), 0, 0))
+	return root
+
+
+func cassette() -> Node3D:
+	var root := node("Cassette")
+	part(root, "Shell", bbox(Vector3(0.1, 0.016, 0.064), 0.003, "black_plastic"), Vector3(0, 0.008, 0))
+	part(root, "Label", bbox(Vector3(0.08, 0.002, 0.035), 0.0005, "porcelain"), Vector3(0, 0.017, -0.006))
+	return root
+
+
+func camera_item() -> Node3D:
+	var root := node("Camera")
+	part(root, "Body", bbox(Vector3(0.16, 0.11, 0.09), 0.015, "black_plastic"), Vector3(0, 0.055, 0))
+	part(root, "Lens", cyl(0.035, 0.035, 0.05, "metal", 12), Vector3(0, 0.055, -0.06), Vector3(90, 0, 0))
+	part(root, "Flash", bbox(Vector3(0.05, 0.025, 0.01), 0.004, "porcelain"), Vector3(0.04, 0.09, -0.046))
+	return root
+
+
+func rubber_duck_crate() -> Node3D:
+	var root := node("DuckCrate")
+	attach(root, crate(0.5))
+	for k in 5:
+		part(root, "Duck", sphere(0.05, "toy_yellow"), Vector3(-0.15 + k * 0.08, 0.53, (k % 2) * 0.08 - 0.04))
+	return root
+
+
+func vending_machine() -> Node3D:
+	var root := node("Vending")
+	part(root, "Body", bbox(Vector3(0.9, 1.9, 0.75), 0.03, "toy_red"), Vector3(0, 0.95, 0))
+	part(root, "Glass", bbox(Vector3(0.6, 1.2, 0.01), 0.003, "e_screen"), Vector3(-0.1, 1.15, 0.38))
+	part(root, "Slot", bbox(Vector3(0.12, 0.25, 0.02), 0.005, "black_plastic"), Vector3(0.32, 1.2, 0.38))
 	return root

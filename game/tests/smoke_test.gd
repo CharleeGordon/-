@@ -14,7 +14,7 @@ var failures := 0
 
 func _ready() -> void:
 	var saved_progress := Save.progress.duplicate(true)
-	Save.progress = {"night_unlocked": 1, "endings": [], "notes": [], "keycard": false}
+	Save.progress = {"night_unlocked": 1, "endings": [], "notes": [], "keycard": false, "tapes": []}
 	await _night1()
 	await _checkpoint()
 	await _night2()
@@ -103,10 +103,21 @@ func _night1() -> void:
 	check(Shift.is_task_active("patrol"), "patrol task given")
 
 	var map: RID = player.get_world_3d().navigation_map
+	# Ground floor, upper floor (y 5.5) and basement (y -4.5): enemies must be able to path across floors.
+	museum.get_node("StairBlock").open()
+	for d in ["DoorCurio", "DoorWax", "DoorLibrary", "DoorPlanet", "DoorNatural", "DoorArchives", "DoorVault"]:
+		museum.get_node(d).open(true)
+	await frames(30)
 	for target in [Vector3(0, 0, 13), Vector3(-17, 0, 2), Vector3(-6, 0, -17), Vector3(6, 0, -16), Vector3(21, 0, -12),
-			Vector3(-13, 0, 15), Vector3(12, 0, 16), Vector3(6, 0, -26)]:
+			Vector3(-13, 0, 15), Vector3(12, 0, 16), Vector3(-6, 5.5, -16), Vector3(1.5, 5.5, -12), Vector3(12, 5.5, 19.5),
+			Vector3(20, 5.5, -10), Vector3(0, 5.5, 13), Vector3(-17, -4.5, -6), Vector3(-6, -4.5, -16), Vector3(6, -4.5, -14)]:
 		var path := NavigationServer3D.map_get_path(map, Vector3(0, 0, 0), target, true)
 		check(path.size() > 0 and path[path.size() - 1].distance_to(target) < 1.0, "navigation lobby -> %s" % str(target))
+	await start_night(1)
+	await use("Interactables/PunchClock")
+	await use("Interactables/RulesPoster")
+	await use("Interactables/Flashlight")
+	check(not museum.get_node("StairBlock").is_open(), "upstairs closed on night 1")
 
 	for cp in ["CheckpointGallery", "CheckpointEgypt", "CheckpointDino"]:
 		await use("Interactables/" + cp)
@@ -145,6 +156,8 @@ func _night1() -> void:
 	await frames(2)
 	check(not Shift.power_on and Shift.is_task_active("breaker"), "blackout at 3 AM")
 	check(Shift.has_checkpoint(), "checkpoint saved at 3 AM")
+	await put_player(Vector3(-17, -4.45, 1.0), Vector3(-12.45, -3.1, 1.0))
+	check(player.current_room == "boiler" and player.current_level == -1, "player is in the basement boiler room")
 	await use("Interactables/Breaker")
 	check(Shift.power_on and Shift.is_task_done("breaker"), "breaker restores power")
 
@@ -193,10 +206,32 @@ func _night2() -> void:
 	check(museum.find_child("DoorCurio", false, false).is_open(), "curiosities open on night 2")
 	await use("Interactables/PunchClock")
 	check(Shift.is_task_active("bulbs") and Shift.is_task_active("wind"), "night 2 tasks given")
+	check(museum.get_node("StairBlock").is_open(), "grand staircase open on night 2")
+	await use("Interactables/CameraPickup")
+	check(player.has_camera and player.film >= 3, "instant camera picked up")
+	await put_player(Vector3(12, 5.55, 12.5), Vector3(12, 6.0, 16))
+	check(player.current_room == "toyroom" and player.current_level == 1, "player upstairs in the toy room")
 	Shift.skip_hour()
 	await frames(2)
 	var auto: Node3D = museum.get_node("Automaton")
 	check(auto.enabled, "automaton running at 1 AM")
+	var doll: Node3D = museum.get_node("Dolls/Doll1")
+	check(doll.active, "dolls awake at 1 AM")
+	await put_player(Vector3(12, 5.55, 12.5), doll.global_position + Vector3(0, 0.5, 0))
+	var d0 := doll.global_position
+	await seconds(1.0)
+	check(doll.global_position.distance_to(d0) < 0.05, "doll frozen while watched")
+	player.rotation.y += PI
+	await seconds(0.6)
+	check(doll.global_position.distance_to(d0) > 0.3, "doll creeps closer when not watched")
+	await put_player(Vector3(12, 5.55, 12.5), doll.global_position + Vector3(0, 0.5, 0))
+	var film0: int = player.film
+	player.take_photo()
+	await frames(3)
+	check(player.film == film0 - 1 and doll._stun > 0.0, "camera flash stuns a doll")
+	check(Shift.running, "survived the Tea Party " + end_title())
+	for d in museum.get_node("Dolls").get_children():
+		d.active = false
 	await seconds(1.0)
 	check(auto.spring < 100.0, "spring runs down")
 	await use("Interactables/WindCrank")
@@ -237,6 +272,21 @@ func _night3() -> void:
 	check(Shift.is_task_active("windows"), "windows task")
 	await use("Interactables/WindowGallery")
 	check(Shift.flags.get("closed", []).has("WindowGallery"), "window closed")
+	check(museum.get_node("DoorLibrary").is_open(), "library open on night 3")
+	for i in 3:
+		await use("Interactables/Books%d" % (i + 1))
+	check(Shift.is_task_done("books"), "books re-shelved")
+	Shift.skip_hour()
+	await frames(2)
+	var moths: Node = museum.get_node("MothsLibrary")
+	check(moths.enabled, "moths active in the library")
+	Shift.skip_hour()
+	Shift.skip_hour()
+	await frames(2)
+	check(Shift.is_task_active("projector"), "3 AM show starts")
+	await use("Interactables/ProjectorSwitch")
+	check(Shift.is_task_done("projector"), "projector switched off")
+	await use("Interactables/Breaker")
 	var duchess: Node = museum.get_node("Duchess")
 	duchess.set_enabled(true, 0.1)
 	await put_player(Vector3(-6, 0.05, -14), Vector3(-6, 1.6, -20))
@@ -258,23 +308,36 @@ func _night4() -> void:
 	await start_night(4)
 	check(museum.find_child("DoorWax", false, false).is_open(), "wax hall open on night 4")
 	check(Shift.flags.get("dark_rooms", []).has("wax"), "budget cuts: wax hall dark")
+	check(museum.get_node("DoorArchives").is_open() and not museum.get_node("DoorVault").is_open(), "archives open, vault locked on night 4")
 	await use("Interactables/PunchClock")
+	await use("Interactables/DuckCrate")
+	check(player.ducks == 3 and Shift.is_task_done("ducks"), "took squeaky ducks")
+	await use("Interactables/ArchiveFile")
+	check(Shift.is_task_done("archives"), "read Brenda's staff file")
 	Shift.skip_hour()
 	await frames(3)
 	var gary: Node3D = museum.get_node("Gary")
 	check(gary.enabled and gary.state == 1, "Gary patrols at 1 AM")
 	# Stand in front of Gary, in his beam
-	gary.global_position = Vector3(0, 0, 4)
+	gary.global_position = Vector3(5, 0, 6)
 	gary.rotation.y = 0.0 # facing -Z, down the lobby
 	var saved_points: Array[Vector3] = gary._points.duplicate()
-	gary._points = [Vector3(0, 0, -8)] as Array[Vector3] # walk toward the player
-	await put_player(Vector3(0, 0.05, -1.0), Vector3(0, 1.6, 4))
+	gary._points = [Vector3(5, 0, -8)] as Array[Vector3] # walk toward the player
+	await put_player(Vector3(5, 0.05, 0.5), Vector3(5, 1.6, 6))
 	await seconds(1.5)
 	gary._points = saved_points
 	check(gary.state == 3 or gary.state == 4, "Gary spots the player in his beam")
 	await to_office()
 	await seconds(1.0)
 	check(gary.state != 4, "Gary gives up when the player reaches the office")
+	gary.global_position = Vector3(-6, 0, -4)
+	gary.state = 1
+	await put_player(Vector3(0, 0.05, 12.5), Vector3(0, 0.5, 4))
+	player.throw_duck()
+	check(player.ducks == 2, "threw a squeaky duck")
+	Shift.make_noise(Vector3(-6, 0, 2), 20.0)
+	await frames(3)
+	check(gary.state == 2, "Gary goes to investigate the squeak")
 	await use("Interactables/GaryLocker")
 	check(bool(Save.progress["keycard"]), "keycard found in Gary's locker")
 
@@ -289,11 +352,27 @@ func _night5() -> void:
 	await use("Duck")
 	check(player.carrying == "duck", "took the Duck")
 	check(museum.get_node("Knight").active and museum.get_node("Gary").enabled and museum.get_node("Duchess").enabled, "everything wakes up")
-	await put_player(Vector3(6, 0.05, -26.5), Vector3(6, 1.0, -28.5))
+	var pem: Node3D = museum.get_node("Pemberton")
+	await put_player(Vector3(-17, -4.45, -6), Vector3(-17, -3, -10))
+	await frames(5)
+	check(pem.state != 0 and pem.visible, "Pemberton awakens when the Duck enters the basement")
+	pem.global_position = player.global_position + Vector3(3, 0, 0)
+	await frames(3)
+	player.camera.look_at(pem.global_position + Vector3(0, 1.0, 0))
+	await frames(2)
+	player.take_photo()
+	await frames(2)
+	check(pem._stun > 0.0, "camera flash stuns Pemberton")
+	player.camera.rotation = Vector3.ZERO
+	await put_player(Vector3(6, -4.45, -16.5), Vector3(6, -3.5, -19.5))
 	await frames(10)
+	check(Shift.is_task_done("altar"), "Duck placed on the altar")
+	check(pem.state == 0, "Pemberton sleeps once the Duck is on the altar")
+	await seconds(6.0)
 	if hud._reading:
 		hud.close_note()
 	await frames(2)
-	check(Shift.is_task_done("altar"), "Duck placed on the altar")
+	check(Save.progress["notes"].has(17), "Brenda's last note shown at the altar")
 	await use("Interactables/AltarMelt")
+	await seconds(6.0)
 	check(Save.progress["endings"].has("melt"), "melt ending reached")

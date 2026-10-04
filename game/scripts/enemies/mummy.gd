@@ -16,8 +16,16 @@ var _groan_timer := 0.0
 var _groans: Array[AudioStream] = []
 
 
+var _stun := 0.0
+
+
+func stun(t: float) -> void:
+	_stun = t
+
+
 func _ready() -> void:
 	super._ready()
+	add_to_group("stunnable")
 	step_sounds = [preload("res://audio/mummy_shuffle.wav")]
 	_groans = [preload("res://audio/mummy_groan_1.wav"), preload("res://audio/mummy_groan_2.wav"), preload("res://audio/mummy_groan_3.wav")]
 	_groan = make_3d_sound(null, 9.0, 2.0)
@@ -58,7 +66,8 @@ func put_to_sleep() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not Shift.running or not find_player() or not nav_ready():
+	_stun = maxf(_stun - delta, 0.0)
+	if not Shift.running or not find_player() or not nav_ready() or _stun > 0.0:
 		stand_still(delta)
 		return
 	match state:

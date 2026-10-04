@@ -308,32 +308,26 @@ static func plane(w: float, h: float, mat: Material) -> ArrayMesh:
 	return _commit(st, mat)
 
 
-## Merges several meshes (each with a transform) into one multi-surface ArrayMesh.
+## Merges several meshes (each with a transform) into one ArrayMesh, one surface per material.
 static func merge(parts: Array) -> ArrayMesh:
-	var out := ArrayMesh.new()
+	var tools := {}
+	var order := []
 	for part in parts:
-		var mesh: ArrayMesh = part[0]
+		var mesh: Mesh = part[0]
 		var xf: Transform3D = part[1]
 		for s in mesh.get_surface_count():
-			var st := SurfaceTool.new()
-			st.create_from(mesh, s)
-			var arrays := st.commit_to_arrays()
-			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-			var norms: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
-			var tans: PackedFloat32Array = arrays[Mesh.ARRAY_TANGENT]
-			for i in verts.size():
-				verts[i] = xf * verts[i]
-				norms[i] = (xf.basis * norms[i]).normalized()
-				if tans.size() >= (i + 1) * 4:
-					var t := (xf.basis * Vector3(tans[i * 4], tans[i * 4 + 1], tans[i * 4 + 2])).normalized()
-					tans[i * 4] = t.x
-					tans[i * 4 + 1] = t.y
-					tans[i * 4 + 2] = t.z
-			arrays[Mesh.ARRAY_VERTEX] = verts
-			arrays[Mesh.ARRAY_NORMAL] = norms
-			arrays[Mesh.ARRAY_TANGENT] = tans
-			out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-			out.surface_set_material(out.get_surface_count() - 1, mesh.surface_get_material(s))
+			var mat := mesh.surface_get_material(s)
+			if not tools.has(mat):
+				var st := SurfaceTool.new()
+				st.begin(Mesh.PRIMITIVE_TRIANGLES)
+				tools[mat] = st
+				order.append(mat)
+			(tools[mat] as SurfaceTool).append_from(mesh, s, xf)
+	var out := ArrayMesh.new()
+	for mat in order:
+		var st: SurfaceTool = tools[mat]
+		st.set_material(mat)
+		st.commit(out)
 	return out
 
 

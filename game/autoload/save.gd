@@ -24,6 +24,7 @@ var progress := {
 	"endings": [],
 	"notes": [],
 	"keycard": false,
+	"tapes": [],
 }
 
 
@@ -81,7 +82,12 @@ func apply_quality(env: Environment, viewport: Viewport) -> void:
 		env.volumetric_fog_enabled = q >= 1
 		env.glow_enabled = true
 		env.ssil_enabled = q >= 3
-		env.sdfgi_enabled = q >= 3
+		# Real-time global illumination (light bouncing off walls) from High up.
+		env.sdfgi_enabled = q >= 2
+		env.sdfgi_cascades = 4 if q == 2 else 6
+		env.sdfgi_use_occlusion = true
+		env.sdfgi_bounce_feedback = 0.4
+		env.sdfgi_energy = 0.7
 		env.ssr_enabled = q >= 2
 	if viewport:
 		viewport.msaa_3d = [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_2X, Viewport.MSAA_4X][q]
@@ -89,6 +95,9 @@ func apply_quality(env: Environment, viewport: Viewport) -> void:
 		viewport.scaling_3d_scale = 0.75 if q == 0 else 1.0
 		viewport.positional_shadow_atlas_size = [1024, 2048, 4096, 4096][q]
 	RenderingServer.directional_shadow_atlas_set_size([1024, 2048, 4096, 4096][q], true)
+	RenderingServer.environment_set_sdfgi_ray_count(RenderingServer.ENV_SDFGI_RAY_COUNT_32 if q == 2 else RenderingServer.ENV_SDFGI_RAY_COUNT_64)
+	RenderingServer.environment_set_ssao_quality(RenderingServer.ENV_SSAO_QUALITY_MEDIUM if q < 3 else RenderingServer.ENV_SSAO_QUALITY_HIGH, true, 0.5, 2, 50, 300)
+	RenderingServer.environment_set_volumetric_fog_volume_size(64 if q < 2 else 128, 64 if q < 2 else 128)
 
 
 func unlock_night(n: int) -> void:
@@ -99,6 +108,12 @@ func unlock_night(n: int) -> void:
 func add_note(id: int) -> void:
 	if not progress["notes"].has(id):
 		progress["notes"].append(id)
+		save_all()
+
+
+func add_tape(id: int) -> void:
+	if not progress["tapes"].has(id):
+		progress["tapes"].append(id)
 		save_all()
 
 

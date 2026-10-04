@@ -37,6 +37,50 @@ func note_ids() -> Array:
 	return []
 
 
+## Audio tape ids placed tonight.
+func tape_ids() -> Array:
+	return []
+
+
+## Film packs (camera) spawned tonight.
+func film_count() -> int:
+	return 0
+
+
+## Scripted scares: Array of {room, hour, type, pos?, text?, voice?}
+func scares() -> Array:
+	return []
+
+
+func pemberton() -> Node:
+	return museum.get_node("Pemberton")
+
+
+func dolls() -> Array:
+	return museum.get_node("Dolls").get_children()
+
+
+func moths(room: String) -> Node:
+	return museum.get_node_or_null("Moths" + room.capitalize())
+
+
+## Opens a list of locked doors (instantly, at night start).
+func open_doors(names: Array) -> void:
+	for d in names:
+		open_door(d, true)
+
+
+func open_stairs() -> void:
+	var b := museum.get_node_or_null("StairBlock")
+	if b:
+		b.open()
+
+
+## Idle radio chatter from Brenda (one every ~1.5 minutes when nothing else is said).
+func banter() -> Array:
+	return []
+
+
 ## How many batteries spawn tonight.
 func battery_count() -> int:
 	return 4

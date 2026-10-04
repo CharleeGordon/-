@@ -16,6 +16,7 @@ var _roar: AudioStreamPlayer3D
 
 
 func _ready() -> void:
+	add_to_group("dino")
 	head = $Model/Head
 	jaw = $Model/Head/Jaw
 	eye_point = $Model/Head/EyePoint
@@ -44,6 +45,12 @@ func _process(delta: float) -> void:
 	if eye_mat:
 		eye_mat.emission_energy_multiplier = 0.6 + _stare * 6.0
 	if _stare >= STARE_LIMIT:
+		_do_roar(player)
+
+
+func flash_photo(player: Node) -> void:
+	if _cooldown <= 0.0:
+		Shift.say("Rule 4. NO FLASH PHOTOGRAPHY.", "", 2.5)
 		_do_roar(player)
 
 

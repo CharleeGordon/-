@@ -1156,11 +1156,198 @@ def save_music_amb(name, st, loop_len, mono_wav=False):
     print("ambience", name)
 
 
+# ============================================================ v0.3 music ==
+
+def organ(freq, dur, vel=0.6, stops=(1, 2, 3, 4, 6, 8)):
+    """Pipe organ: additive drawbars + slight chiff + wind noise."""
+    n = n_of(dur + 0.4)
+    t = t_of(n)
+    x = np.zeros(n)
+    for k, h in enumerate(stops):
+        if freq * h > SR / 2.2:
+            continue
+        x += np.sin(2 * np.pi * freq * h * t * (1 + 0.0007 * k)) / (1 + k * 0.6)
+    chiff = bandpass(noise(n), freq * 2, min(freq * 8, 12000)) * np.exp(-t * 30) * 0.25
+    wind = bandpass(noise(n), 300, 3000) * 0.01
+    return (x * 0.35 + chiff + wind) * adsr(n, 0.04, 0.1, 0.9, 0.35, dur) * vel
+
+
+def pizz(freq, vel=0.5):
+    return ks_pluck(freq, 0.9, 0.35, 0.985) * vel
+
+
+def upper_floor():
+    """Upstairs: an elegant, wrong little parlour waltz - string quartet pizzicato, celesta, out-of-tune piano."""
+    bpm = 72
+    beat = 60 / bpm
+    length = THEME_BEATS * beat
+    pz, cel, pad, pno = [], [], [], []
+    for bar, ch in enumerate(CHORDS):
+        t0 = bar * 3 * beat
+        pz.append((t0, pizz(hz(ch[0] - 12), 0.8)))
+        pz.append((t0 + beat, pizz(hz(ch[1]), 0.45) + pizz(hz(ch[2]), 0.4)))
+        pz.append((t0 + 2 * beat, pizz(hz(ch[1]), 0.4) + pizz(hz(ch[2]), 0.35)))
+        pad.append((t0, strings([c + 12 for c in ch], 3 * beat, 0.22, attack=1.2, release=1.6, cutoff=1800, vibrato=0.2)))
+    for b, m, d in THEME:
+        if int(b) % 6 < 3 or d >= 2:
+            cel.append((b * beat + 0.02, celesta(hz(m + 12) * 1.004, 1.4, 0.32)))
+        if d >= 3:
+            pno.append((b * beat + beat * 0.5, piano(hz(m - 12) * 0.997, 2.5, 0.25, 0.6)))
+    dust = highpass((rng.random(n_of(length + 4)) > 0.9994) * rng.uniform(-1, 1, n_of(length + 4)), 2000) * 0.25
+    st = mix_stereo([(render(pz, length), -0.3, 0.5), (render(cel, length), 0.35, 0.4), (render(pad, length), 0.0, 0.3),
+                     (render(pno, length), -0.1, 0.35), (dust, 0.0, 0.4)], length + 4)
+    save_music("upper_floor", reverb(st, 3.2, 0.42), length)
+
+
+def basement():
+    """Basement: boiler throb, pipe knocks, a far-away choir humming the waltz through the walls."""
+    length = 72.0
+    n = n_of(length + 4)
+    t = t_of(n)
+    throb = lowpass(brown(n), 70) * (0.6 + 0.4 * np.sin(2 * np.pi * 0.9 * t) ** 2) * 1.2
+    sub = drone([note("D1"), note("A1")], length + 4, 110, 0.05, 0.6)
+    knocks, hum, metal = [], [], []
+    for s in (2.5, 9.0, 9.4, 17.8, 26.0, 33.3, 33.6, 33.9, 45.0, 52.2, 61.0, 66.6):
+        m = n_of(0.5)
+        k = resonator(noise(m), rng.uniform(140, 320), 18) * env_exp(m, 0.05) + resonator(noise(m), rng.uniform(900, 1500), 30) * env_exp(m, 0.02) * 0.4
+        knocks.append((s, k * rng.uniform(0.5, 1.0)))
+    for i, (b, m, d) in enumerate(THEME[:12]):
+        hum.append((14 + b * 1.6, choir([m - 12], d * 1.6 + 0.6, 0.35, "oo", attack=0.5, release=1.0)))
+    for s in (6, 38, 58):
+        metal.append((s, metal_resonance(rng.uniform(90, 200), 7.0, 0.5)))
+    hum_mix = lowpass(render(hum, length), 900)
+    st = mix_stereo([(throb, 0.0, 0.5), (sub, 0.0, 0.4), (render(knocks, length), -0.5, 0.45), (hum_mix, 0.4, 0.3),
+                     (render(metal, length), 0.2, 0.3)], length + 4)
+    save_music("basement", reverb(st, 4.5, 0.45, damping=2200), length)
+
+
+def brenda_theme():
+    """Brenda's theme: the waltz, slowed and turned major - a lullaby for Lucy. Piano, cello, soft strings."""
+    bpm = 58
+    beat = 60 / bpm
+    major = {note("F5"): note("F#5"), note("F4"): note("F#4"), note("C6"): note("C#6"), note("C5"): note("C#5")}
+    length = THEME_BEATS * beat
+    pno, cello, pad, box = [], [], [], []
+    chords = [[c if c % 12 not in (5, 0) else c + 1 for c in ch] for ch in CHORDS]  # F->F#, C->C#: D major
+    for b, m, d in THEME:
+        mm = major.get(m, m if m % 12 not in (5, 0) else m + 1)
+        pno.append((b * beat + rng.uniform(0, 0.04), piano(hz(mm), d * beat + 1.5, 0.42, 0.65)))
+        if b >= 24 and d >= 2:
+            box.append((b * beat, music_box(hz(mm + 12), 1.8, 0.35)))
+    for bar, ch in enumerate(chords):
+        t0 = bar * 3 * beat
+        cello.append((t0, strings([ch[0] - 12], 3 * beat, 0.45, attack=0.6, release=1.2, cutoff=1400, vibrato=0.25)))
+        pad.append((t0, strings([c + 12 for c in ch], 3 * beat, 0.2, attack=1.5, release=2.0, cutoff=2200)))
+        pno.append((t0, piano(hz(ch[0] - 12), 3 * beat, 0.25, 0.5)))
+    st = mix_stereo([(render(pno, length), -0.1, 0.55), (render(cello, length), -0.3, 0.4), (render(pad, length), 0.2, 0.3),
+                     (render(box, length), 0.4, 0.3)], length + 4)
+    save_music("brenda_theme", reverb(st, 4.0, 0.45), length)
+
+
+def pemberton_chase():
+    """The founder's chase: the waltz as a furious 3/4 pipe-organ toccata with timpani and choir."""
+    bpm = 176
+    beat = 60 / bpm
+    length = THEME_BEATS * beat * 2
+    org, drums, ch, bass = [], [], [], []
+    for rep in range(2):
+        off = rep * THEME_BEATS * beat
+        for b, m, d in THEME:
+            org.append((off + b * beat, organ(hz(m), d * beat * 0.9, 0.55)))
+            if rep == 1:
+                org.append((off + b * beat, organ(hz(m + 12), d * beat * 0.9, 0.3, (1, 2, 4))))
+        for bar, chd in enumerate(CHORDS):
+            t0 = off + bar * 3 * beat
+            bass.append((t0, organ(hz(chd[0] - 24), 3 * beat * 0.95, 0.7, (1, 2, 3))))
+            for k in range(6):
+                org.append((t0 + k * beat / 2, organ(hz(chd[k % len(chd)] + 12), beat / 2 * 0.7, 0.18, (1, 2))))
+            drums.append((t0, timpani(hz(chd[0] - 12), 1.0)))
+            drums.append((t0 + beat, taiko(0.45, 1.3)))
+            drums.append((t0 + 2 * beat, taiko(0.55, 1.2)))
+            if bar % 4 == 3:
+                drums.append((t0 + 2.5 * beat, snare(0.5)))
+            if bar % 8 == 0:
+                drums.append((t0, cymbal(0.4)))
+            if rep == 1 or bar % 2 == 0:
+                ch.append((t0, choir([c + 12 for c in chd], 3 * beat, 0.4, "ah", attack=0.15, release=0.4)))
+    st = mix_stereo([(render(org, length), 0.15, 0.5), (render(bass, length), 0.0, 0.45), (render(drums, length), 0.0, 0.6),
+                     (render(ch, length), -0.2, 0.35)], length + 4)
+    save_music("pemberton_chase", reverb(st, 3.8, 0.4), length)
+
+
+def sfx_v3():
+    # Doll giggle: several tiny high voices, "hee-hee-hee", wet and close
+    out = np.zeros(n_of(1.8))
+    for v in range(3):
+        for k in range(3 + v % 2):
+            dur = 0.13
+            pitch = 620 + v * 90 + rng.uniform(-30, 30) + (k % 2) * 40
+            g = formant_voice(pitch, ["i", "e"], dur, 0.6)
+            place(out, g * (0.8 - k * 0.12), 0.1 + v * 0.17 + k * 0.17 + rng.uniform(0, 0.03))
+    save_sfx("doll_giggle", reverb(out[:, None].repeat(2, 1) if False else np.stack([out, out], 1), 1.6, 0.35)[:, 0])
+    # Moths: dense soft flutter loop (2 s)
+    L = 2.0
+    n = n_of(L + 1)
+    x = np.zeros(n)
+    for k in range(60):
+        m = n_of(0.35)
+        tt = t_of(m)
+        rate = rng.uniform(25, 45)
+        flap = (np.abs(np.sin(np.pi * rate * tt)) ** 4) * bandpass(noise(m), 200, 2500)
+        place(x, flap * np.sin(np.pi * tt / 0.35) * rng.uniform(0.2, 0.6), rng.uniform(0, L))
+    st = make_loop(np.stack([x, x], 1), L)
+    save_sfx("moths", st[:, 0])
+    # Squeaky rubber duck
+    m = n_of(0.45)
+    tt = t_of(m)
+    f = 1100 + 900 * np.sin(np.pi * np.minimum(tt / 0.3, 1)) ** 0.5
+    sq = (np.sin(2 * np.pi * np.cumsum(f) / SR) + 0.4 * np.sin(4 * np.pi * np.cumsum(f) / SR)) * adsr(m, 0.02, 0.05, 0.8, 0.12) + bandpass(noise(m), 2000, 6000) * 0.08 * env_exp(m, 0.1)
+    save_sfx("squeak", soft_clip(sq, 2.0))
+    # Camera flash: shutter click + capacitor whine + film advance
+    m = n_of(1.4)
+    tt = t_of(m)
+    x = np.zeros(m)
+    c = n_of(0.03)
+    place(x, resonator(noise(c), 3500, 8) * env_exp(c, 0.004), 0.0)
+    place(x, resonator(noise(c), 2200, 6) * env_exp(c, 0.006) * 0.7, 0.06)
+    pop = n_of(0.15)
+    place(x, bandpass(noise(pop), 800, 9000) * env_exp(pop, 0.02) * 0.6, 0.02)
+    w = n_of(1.1)
+    wt = t_of(w)
+    place(x, np.sin(2 * np.pi * np.cumsum(2000 + 6000 * wt / 1.1) / SR) * 0.06 * np.minimum(1, (1.1 - wt) * 4), 0.25)
+    for k in range(5):
+        place(x, resonator(noise(c), 1600, 10) * env_exp(c, 0.004) * 0.4, 0.3 + k * 0.05)
+    save_sfx("camera_flash", x)
+    # Breaker / heavy switch clunk
+    m = n_of(0.6)
+    x = lowpass(noise(m), 600) * env_exp(m, 0.03) + resonator(noise(m), 180, 12) * env_exp(m, 0.08) * 0.6 + resonator(noise(m), 2400, 20) * env_exp(m, 0.01) * 0.4
+    save_sfx("breaker", x)
+
+
+def ambience_v3():
+    # Music box loop for the Toy Room: the waltz, slowly unwinding, one bar per 3 s
+    beat = 0.5
+    length = 24 * beat
+    ev = []
+    for b, m, d in THEME:
+        if b < 24:
+            ev.append((b * beat, music_box(hz(m + 12) * 0.996, 1.6, 0.7)))
+    st = mix_stereo([(render(ev, length), 0.0, 0.8)], length + 3)
+    save_music_amb("music_box_loop", reverb(st, 1.5, 0.3), length, mono_wav=True)
+    # Boiler hum
+    L = 16.0
+    n = n_of(L + 2)
+    t = t_of(n)
+    hum = lowpass(brown(n), 120) * 0.8 + np.sin(2 * np.pi * 50 * t) * 0.05 + np.sin(2 * np.pi * 100 * t) * 0.03 + bandpass(noise(n), 300, 900) * 0.04 * (1 + np.sin(2 * np.pi * 0.25 * t))
+    save_music_amb("boiler_hum", np.stack([hum, hum], 1), L, mono_wav=True)
+
+
 if __name__ == "__main__":
     import sys
     os.makedirs(MUSIC, exist_ok=True)
     only = set(sys.argv[1:])
     for f in [menu_theme, explore_calm, explore_tense, danger_near, chase, blackout, office_radio, duchess_theme,
-              automaton_tune, gary_whistle, finale, dawn, credits, gramophone, stingers, sfx_all, ambience]:
+              automaton_tune, gary_whistle, finale, dawn, credits, gramophone, stingers, sfx_all, ambience,
+              upper_floor, basement, brenda_theme, pemberton_chase, sfx_v3, ambience_v3]:
         if not only or f.__name__ in only:
             f()

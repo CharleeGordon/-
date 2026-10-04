@@ -268,6 +268,12 @@ func say(text: String, speaker: String = "", duration: float = 4.0) -> void:
 	message.emit(text, speaker, duration)
 
 
+## Voiced version of a spoken line (audio/voice/line_<md5>.ogg, made by tools/gen_voice.py), or null.
+func voice_line(text: String) -> AudioStream:
+	var path := "res://audio/voice/line_%s.ogg" % text.md5_text().substr(0, 10)
+	return load(path) if ResourceLoader.exists(path) else null
+
+
 func set_power(on: bool) -> void:
 	if power_on == on:
 		return
@@ -307,11 +313,58 @@ func _setup_input() -> void:
 	_bind("pause", [KEY_ESCAPE])
 	_bind("fullscreen", [KEY_F11])
 	_bind("debug_skip_hour", [KEY_F9])
+	_bind("camera_flash", [KEY_R])
+	_bind("throw", [KEY_G])
+	_mouse("camera_flash", MOUSE_BUTTON_RIGHT)
+	_mouse("throw", MOUSE_BUTTON_MIDDLE)
+	# Gamepad (Xbox layout)
+	_axis("move_left", JOY_AXIS_LEFT_X, -1.0)
+	_axis("move_right", JOY_AXIS_LEFT_X, 1.0)
+	_axis("move_forward", JOY_AXIS_LEFT_Y, -1.0)
+	_axis("move_back", JOY_AXIS_LEFT_Y, 1.0)
+	_axis("look_left", JOY_AXIS_RIGHT_X, -1.0)
+	_axis("look_right", JOY_AXIS_RIGHT_X, 1.0)
+	_axis("look_up", JOY_AXIS_RIGHT_Y, -1.0)
+	_axis("look_down", JOY_AXIS_RIGHT_Y, 1.0)
+	_axis("camera_flash", JOY_AXIS_TRIGGER_RIGHT, 1.0)
+	_axis("throw", JOY_AXIS_TRIGGER_LEFT, 1.0)
+	_joy("interact", JOY_BUTTON_A)
+	_joy("flashlight", JOY_BUTTON_X)
+	_joy("journal", JOY_BUTTON_Y)
+	_joy("crouch", JOY_BUTTON_B)
+	_joy("sprint", JOY_BUTTON_LEFT_STICK)
+	_joy("sprint", JOY_BUTTON_LEFT_SHOULDER)
+	_joy("pause", JOY_BUTTON_START)
 	if not InputMap.has_action("interact_mouse"):
 		InputMap.add_action("interact_mouse")
 		var mb := InputEventMouseButton.new()
 		mb.button_index = MOUSE_BUTTON_LEFT
 		InputMap.action_add_event("interact_mouse", mb)
+
+
+func _mouse(action: String, button: MouseButton) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
+	var ev := InputEventMouseButton.new()
+	ev.button_index = button
+	InputMap.action_add_event(action, ev)
+
+
+func _joy(action: String, button: JoyButton) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
+	var ev := InputEventJoypadButton.new()
+	ev.button_index = button
+	InputMap.action_add_event(action, ev)
+
+
+func _axis(action: String, axis: JoyAxis, dir: float) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action, 0.25)
+	var ev := InputEventJoypadMotion.new()
+	ev.axis = axis
+	ev.axis_value = dir
+	InputMap.action_add_event(action, ev)
 
 
 func _bind(action: String, keys: Array) -> void:

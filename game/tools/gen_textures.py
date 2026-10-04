@@ -570,6 +570,116 @@ def night_sky():
     print("sky")
 
 
+def save_rgba(name, rgb, alpha, size=None):
+    arr = np.dstack([np.clip(rgb, 0, 1), np.clip(alpha, 0, 1)])
+    img = Image.fromarray((arr * 255).astype(np.uint8), "RGBA")
+    if size:
+        img = img.resize((size, size), Image.LANCZOS)
+    img.save(os.path.join(OUT, name))
+    print("decal", name)
+
+
+def decals():
+    S = 512
+    y, x = np.mgrid[0:S, 0:S] / (S - 1) * 2 - 1
+    r = np.sqrt(x * x + y * y)
+    n = fbm(S, 4, 6, 0.55, seed=400)
+    # Grime / water stain blob
+    a = np.clip((1 - r) * 1.6 - 0.2 + (n - 0.5) * 1.2, 0, 1) ** 1.5 * 0.8
+    edge = np.clip(1 - np.abs(a - 0.35) / 0.06, 0, 1) * 0.5
+    save_rgba("decal_grime.png", np.dstack([0.12 + n * 0, 0.1 + n * 0, 0.07 + n * 0]), np.clip(a * 0.7 + edge, 0, 1))
+    # Crack
+    img = Image.new("L", (S, S), 0)
+    d = ImageDraw.Draw(img)
+    rr = np.random.default_rng(401)
+    def branch(px, py, ang, ln, w):
+        for i in range(int(ln)):
+            nx = px + math.cos(ang) * 6
+            ny = py + math.sin(ang) * 6
+            d.line([px, py, nx, ny], fill=255, width=max(1, int(w)))
+            px, py = nx, ny
+            ang += rr.uniform(-0.5, 0.5)
+            w *= 0.985
+            if rr.random() < 0.06 and w > 1.2:
+                branch(px, py, ang + rr.uniform(-1.2, 1.2), ln * 0.4, w * 0.6)
+    for k in range(3):
+        branch(S / 2, S / 2, rr.uniform(0, 6.28), 45, 5)
+    crack = np.array(img.filter(ImageFilter.GaussianBlur(0.8))) / 255.0
+    save_rgba("decal_crack.png", np.dstack([np.full((S, S), 0.05)] * 3), crack * 0.9)
+    # Cobweb (corner): radial threads + spiral rings in a quarter
+    img = Image.new("L", (S, S), 0)
+    d = ImageDraw.Draw(img)
+    for k in range(9):
+        ang = k / 8 * math.pi / 2
+        d.line([0, 0, math.cos(ang) * S, math.sin(ang) * S], fill=200, width=2)
+    for ring in range(1, 14):
+        pts = []
+        for k in range(9):
+            ang = k / 8 * math.pi / 2
+            rad = ring * S / 14 * (0.92 + 0.08 * math.sin(k * 2.1 + ring))
+            pts.append((math.cos(ang) * rad, math.sin(ang) * rad))
+        d.line(pts, fill=150, width=1)
+    web = np.array(img.filter(ImageFilter.GaussianBlur(0.6))) / 255.0
+    save_rgba("decal_cobweb.png", np.dstack([np.full((S, S), 0.85)] * 3), web)
+    # Dusty footprints trail (pairs of shoe prints)
+    img = Image.new("L", (S, S), 0)
+    d = ImageDraw.Draw(img)
+    for k in range(4):
+        cy = S - 60 - k * 120
+        for side, off in ((-1, 0), (1, 60)):
+            cx = S / 2 + side * 40
+            yy = cy - off
+            d.ellipse([cx - 22, yy - 45, cx + 22, yy + 20], fill=170)
+            d.ellipse([cx - 18, yy + 28, cx + 18, yy + 58], fill=150)
+    fp = np.array(img.filter(ImageFilter.GaussianBlur(2))) / 255.0 * (0.6 + 0.4 * fbm(S, 16, 4, 0.5, seed=402))
+    save_rgba("decal_footprints.png", np.dstack([np.full((S, S), 0.55), np.full((S, S), 0.5), np.full((S, S), 0.42)]), fp * 0.8)
+    # Ritual circle for the vault floor
+    img = Image.new("L", (S, S), 0)
+    d = ImageDraw.Draw(img)
+    for rad, w in ((240, 6), (210, 3), (120, 4)):
+        d.ellipse([S / 2 - rad, S / 2 - rad, S / 2 + rad, S / 2 + rad], outline=255, width=w)
+    for k in range(5):
+        a0 = k / 5 * 2 * math.pi - math.pi / 2
+        a1 = (k + 2) / 5 * 2 * math.pi - math.pi / 2
+        d.line([S / 2 + math.cos(a0) * 210, S / 2 + math.sin(a0) * 210, S / 2 + math.cos(a1) * 210, S / 2 + math.sin(a1) * 210], fill=255, width=4)
+    ring = np.array(img.filter(ImageFilter.GaussianBlur(1.2))) / 255.0
+    save_rgba("decal_ritual.png", np.dstack([np.full((S, S), 0.55), np.full((S, S), 0.05), np.full((S, S), 0.03)]), ring * 0.85)
+
+
+def dome_stars():
+    W, H = 2048, 512
+    img = np.zeros((H, W, 3))
+    r = np.random.default_rng(500)
+    for k in range(2600):
+        x, yv = r.integers(0, W), r.integers(0, H)
+        b = r.random() ** 3
+        rad = 1 if b < 0.8 else 2
+        img[max(0, yv - rad + 1):yv + rad, max(0, x - rad + 1):x + rad] += b * np.array([0.9, 0.92, 1.0])
+    pil = Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
+    d = ImageDraw.Draw(pil)
+    for c in range(9):
+        pts = [(r.integers(0, W), r.integers(40, H - 40))]
+        for k in range(r.integers(3, 6)):
+            pts.append((pts[-1][0] + r.integers(-120, 120), int(np.clip(pts[-1][1] + r.integers(-80, 80), 10, H - 10))))
+        d.line(pts, fill=(60, 80, 140), width=1)
+        for p in pts:
+            d.ellipse([p[0] - 3, p[1] - 3, p[0] + 3, p[1] + 3], fill=(255, 240, 200))
+    neb = fbm(512, 4, 5, 0.55, seed=501)
+    neb = np.array(Image.fromarray((neb * 255).astype(np.uint8)).resize((W, H))) / 255.0
+    arr = np.array(pil) / 255.0 + np.clip(neb - 0.55, 0, 1)[..., None] * np.array([0.25, 0.1, 0.35])
+    Image.fromarray((np.clip(arr, 0, 1) * 255).astype(np.uint8)).save(os.path.join(OUT, "dome_stars.jpg"), quality=92)
+    print("dome stars")
+
+
+def family_photo():
+    """Brenda and little Lucy, 1962 (sepia)."""
+    img = oil_canvas(777, "portrait", 512, 640)
+    lum = img.mean(axis=2)
+    sep = np.stack([lum * 1.07, lum * 0.92, lum * 0.72], axis=-1)
+    Image.fromarray((np.clip(sep, 0, 1) * 255).astype(np.uint8)).save(os.path.join(OUT, "photo_brenda.jpg"), quality=90)
+    print("photo")
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     for fn in [marble_floor, wood_floor, dark_wood, plaster, wallpaper, concrete, sandstone_blocks, stone_tiles,
@@ -578,3 +688,6 @@ if __name__ == "__main__":
     flashlight_cookie()
     paintings()
     night_sky()
+    decals()
+    dome_stars()
+    family_photo()

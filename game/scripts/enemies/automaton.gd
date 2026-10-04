@@ -19,8 +19,16 @@ var _booth_pos := Vector3.ZERO
 var _key: Node3D
 
 
+var _stun := 0.0
+
+
+func stun(t: float) -> void:
+	_stun = t
+
+
 func _ready() -> void:
 	super._ready()
+	add_to_group("stunnable")
 	_booth_pos = global_position
 	step_sounds = [preload("res://audio/automaton_step_1.wav"), preload("res://audio/automaton_step_2.wav")]
 	_tune = make_3d_sound(null, 5.0, -2.0)
@@ -75,6 +83,10 @@ func _physics_process(delta: float) -> void:
 				_unwind()
 		State.HUNT:
 			_timer -= delta
+			if _stun > 0.0:
+				_stun -= delta
+				stand_still(delta)
+				return
 			if flat_distance_to_player() < 12.0 and can_see_point(player.camera.global_position, 1.1) and not player.is_hidden:
 				_target = player.global_position
 			if player.noise_radius() > 0.0 and global_position.distance_to(player.global_position) < player.noise_radius() * 1.2:

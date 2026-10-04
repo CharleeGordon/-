@@ -13,6 +13,7 @@ var _was_seen := true
 
 func _ready() -> void:
 	super._ready()
+	add_to_group("knight")
 	step_sounds = [preload("res://audio/knight_step_1.wav"), preload("res://audio/knight_step_2.wav"), preload("res://audio/knight_step_3.wav")]
 	rig.pose({"ShoulderR": Vector3(0.1, 0, 0.05), "ElbowR": Vector3(0.3, 0, 0), "ShoulderL": Vector3(0.2, 0, -0.1)})
 
