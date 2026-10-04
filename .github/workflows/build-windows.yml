@@ -1,0 +1,41 @@
+# Builds the Windows .exe on every push. Download it from the "Actions" tab -> latest run -> Artifacts.
+name: Build Windows
+
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.5"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot + export templates
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz
+          unzip -q Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 godot
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          unzip -q -j Godot_v${GODOT_VERSION}-stable_export_templates.tpz "templates/windows_*_x86_64.exe" "templates/version.txt" -d ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+
+      - name: Import project
+        run: ./godot --headless --path game --import
+
+      - name: Automated playthrough test
+        run: ./godot --headless --path game res://tests/smoke_test.tscn
+
+      - name: Export Windows build
+        run: |
+          mkdir -p build/windows
+          ./godot --headless --path game --export-release "Windows" ../build/windows/DoNotTouchTheExhibits.exe
+          ls -la build/windows
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DoNotTouchTheExhibits-windows
+          path: build/windows/

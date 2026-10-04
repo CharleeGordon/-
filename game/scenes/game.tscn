@@ -1,0 +1,23 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="PackedScene" path="res://scenes/museum.tscn" id="2_museum"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="3_player"]
+[ext_resource type="Script" path="res://scripts/hud.gd" id="4_hud"]
+[ext_resource type="AudioStream" path="res://audio/hum.wav" id="5_hum"]
+
+[node name="Game" type="Node3D"]
+script = ExtResource("1_game")
+
+[node name="Museum" parent="." instance=ExtResource("2_museum")]
+
+[node name="Player" parent="." instance=ExtResource("3_player")]
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("4_hud")
+
+[node name="Sfx" type="AudioStreamPlayer" parent="."]
+
+[node name="Ambience" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("5_hum")
+volume_db = -14.0
