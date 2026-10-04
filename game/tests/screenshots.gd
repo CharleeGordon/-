@@ -19,7 +19,7 @@ const SHOTS := [
 	["12_atrium_stairs", Vector3(0, 0.05, 9.0), Vector3(0, 5.5, -6), false],
 	["13_balcony", Vector3(10, 5.55, 8.5), Vector3(-6, 6.5, -6), false],
 	["14_library", Vector3(-1.5, 5.55, -11.0), Vector3(-9, 6.6, -19), false],
-	["15_planetarium", Vector3(1.5, 5.55, -11.5), Vector3(7, 7.5, -17), false],
+	["15_planetarium", Vector3(2.0, 5.55, -12.0), Vector3(7, 9.5, -17), false],
 	["16_toyroom", Vector3(6, 5.55, 11.5), Vector3(12, 6.0, 16), false],
 	["17_director", Vector3(0, 5.55, 10.8), Vector3(0, 6.5, 16.5), false],
 	["18_natural", Vector3(13.5, 5.55, -5.5), Vector3(24, 6.5, -14), false],
@@ -52,6 +52,10 @@ func _ready() -> void:
 			"DoorWorkshop", "DoorCostume", "DoorToyArmory", "DoorArchives", "DoorVault"]:
 		game.get_node("Museum/" + d).open(true)
 	game.get_node("Museum/StairBlock").open()
+	if args.has("novfog"):
+		game.get_node("Museum/WorldEnvironment").environment.volumetric_fog_enabled = false
+	if args.has("nosdfgi"):
+		game.get_node("Museum/WorldEnvironment").environment.sdfgi_enabled = false
 	await get_tree().create_timer(3.5).timeout
 	for s in SHOTS:
 		if args.has("only") and not String(s[0]).contains(args["only"]):

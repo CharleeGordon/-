@@ -137,11 +137,10 @@ func _make_materials() -> void:
 	for i in 6:
 		flat_mat("book_%d" % i, book_colors[i], 0.75)
 	var dome := StandardMaterial3D.new()
-	dome.albedo_color = Color(0.02, 0.02, 0.03)
+	dome.albedo_color = Color(0.015, 0.017, 0.03)
 	dome.emission_enabled = true
-	dome.emission_texture = _tex("dome_stars")
-	dome.emission = Color.WHITE
-	dome.emission_energy_multiplier = 1.4
+	dome.emission = Color(0.05, 0.07, 0.18)
+	dome.emission_energy_multiplier = 0.6
 	dome.cull_mode = BaseMaterial3D.CULL_DISABLED
 	dome.roughness = 1.0
 	_save(dome, "dome")

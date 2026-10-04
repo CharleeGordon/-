@@ -1218,9 +1218,10 @@ func _library() -> void:
 		solid(P.bookshelf(2.4, 3.0, int(z)), Vector3(-11.6, y, z + 1.5), Vector3(0.45, 3.0, 2.4), 90)
 	for k in 5:
 		solid(P.bookshelf(2.2, 3.2, 10 + k), Vector3(-10.5 + k * 2.3, y, -21.6), Vector3(2.2, 3.2, 0.45))
-	for k in 3:
-		solid(P.bookshelf(2.2, 2.4, 30 + k), Vector3(-9.0 + k * 3.0, y, -12.6), Vector3(2.2, 2.4, 0.45), 180)
-		solid(P.bookshelf(2.2, 2.4, 40 + k), Vector3(-9.0 + k * 3.0, y, -13.05), Vector3(2.2, 2.4, 0.45))
+	for k in 2:  # two islands either side of the doorway (x -7.2..-4.8)
+		var bx: float = [-9.6, -2.4][k]
+		solid(P.bookshelf(2.2, 2.4, 30 + k), Vector3(bx, y, -12.8), Vector3(2.2, 2.4, 0.45), 180)
+		solid(P.bookshelf(2.2, 2.4, 40 + k), Vector3(bx, y, -13.25), Vector3(2.2, 2.4, 0.45))
 	solid(P.reading_desk(), Vector3(-7.0, y, -17.5), Vector3(1.6, 0.8, 0.8))
 	solid(P.reading_desk(), Vector3(-3.0, y, -17.5), Vector3(1.6, 0.8, 0.8))
 	for x in [-7.0, -3.0]:
@@ -1252,6 +1253,31 @@ func _planetarium() -> void:
 	var y := ly(1)
 	var center := Vector3(6, y, -16)
 	put(P.dome(5.95), center + Vector3(0, 3.4, 0))
+	# Painted stars: tiny emissive points scattered over the inside of the dome
+	var star := SphereMesh.new()
+	star.radius = 0.035
+	star.height = 0.07
+	star.radial_segments = 4
+	star.rings = 2
+	star.material = load("res://materials/e_star.tres")
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = star
+	mm.instance_count = 650
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1931
+	for k in mm.instance_count:
+		var a := rng.randf() * TAU
+		var el := asin(rng.randf_range(0.08, 1.0))
+		var dir := Vector3(cos(el) * cos(a), sin(el), cos(el) * sin(a))
+		var sc := rng.randf_range(0.5, 1.8)
+		mm.set_instance_transform(k, Transform3D(Basis.from_scale(Vector3.ONE * sc), dir * 5.85))
+	var stars := MultiMeshInstance3D.new()
+	stars.name = "DomeStars"
+	stars.multimesh = mm
+	stars.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	stars.position = center + Vector3(0, 3.4, 0)
+	visual.add_child(stars)
 	var proj := P.star_projector()
 	proj.name = "Projector"
 	proj.position = center
@@ -1272,7 +1298,7 @@ func _planetarium() -> void:
 		sp.spot_range = 9.0
 		sp.spot_angle = 50.0
 		sp.light_projector = load("res://textures/flashlight_cookie.png")
-		sp.light_volumetric_fog_energy = 3.0
+		sp.light_volumetric_fog_energy = 0.8
 		proj.add_child(sp)
 	interactable("ProjectorSwitch", "projector", "Turn off the star projector", center + Vector3(0, 1.0, 0.8), Vector3(0.8, 0.8, 0.5), Vector3.ZERO, false)
 	plaque("THE PEMBERTON STAR THEATRE. Shows hourly. Nobody books the 3 AM show. Somebody watches it anyway.", Vector3(1.0, y + 1.4, -10.17), 180.0, 0.45)
@@ -1281,7 +1307,7 @@ func _planetarium() -> void:
 	fog.size = Vector3(11.0, 6.0, 11.0)
 	fog.position = center + Vector3(0, 3.0, 0)
 	var fm := FogMaterial.new()
-	fm.density = 0.06
+	fm.density = 0.012
 	fm.albedo = Color(0.45, 0.5, 0.8)
 	fog.material = fm
 	visual.add_child(fog)
@@ -1305,8 +1331,9 @@ func _natural() -> void:
 	solid(P.display_case(1.4, 0.7, 0.9, 0.5), Vector3(20, y, -6), Vector3(1.4, 1.4, 0.7))
 	put(P.specimen_jar(0.3), Vector3(19.6, y + 0.9, -6))
 	put(P.specimen_jar(0.25), Vector3(20.4, y + 0.9, -6))
-	light_omni(Vector3(18, y + 3.2, -11), Color(0.9, 0.95, 0.85), 1.4, 11.0, "natural")
-	light_omni(Vector3(26, y + 3.2, -6), Color(0.9, 0.95, 0.85), 1.0, 9.0, "natural")
+	light_omni(Vector3(18, y + 3.2, -11), Color(0.9, 0.95, 0.85), 2.0, 11.0, "natural")
+	light_omni(Vector3(26, y + 3.2, -6), Color(0.9, 0.95, 0.85), 1.6, 10.0, "natural")
+	light_omni(Vector3(27, y + 3.2, -15), Color(0.9, 0.95, 0.85), 1.2, 8.0, "natural")
 	var moths := Node3D.new()
 	moths.name = "MothsNatural"
 	moths.position = Vector3(20, y + 2.2, -11)
@@ -1398,7 +1425,7 @@ func _director() -> void:
 	solid(P.bookshelf(1.8, 2.6, 77), Vector3(3.6, y, 13.0), Vector3(0.45, 2.6, 1.8), -90)
 	put(P.painting(1.2, 1.5, "painting_founder"), Vector3(-2.0, y + 2.2, 16.82), 180)
 	label("L. HOLLOWAY - MUSEUM DIRECTOR", Vector3(0, y + 2.5, 10.17), 0, 0.0014)
-	light_omni(Vector3(0, y + 3.2, 13.5), Color(1.0, 0.8, 0.6), 1.0, 7.0, "director")
+	light_omni(Vector3(0, y + 3.2, 13.5), Color(1.0, 0.8, 0.6), 1.6, 9.0, "director")
 	emergency(Vector3(0, y + 3.4, 10.4), "director")
 
 
@@ -1421,8 +1448,11 @@ func _toyroom() -> void:
 		mesh_at(P.bbox(Vector3(0.2, 0.2, 0.2), 0.02, ["toy_red", "toy_blue", "toy_yellow"][k % 3]), Vector3(8.0 + (k % 3) * 0.35, y + 0.1 + (k / 3) * 0.2, 19.5), Vector3(0, k * 17, 0), null, "Block")
 	label("THE TEA PARTY (1902)\nFive porcelain dolls. Please do not join them.", Vector3(12, y + 2.6, 21.83), 180, 0.0015)
 	light_spot(Vector3(12, y + 3.7, 14.5), table + Vector3(0, 0.6, 0), Color(1.0, 0.85, 0.75), 4.0, 5.0, 35.0, "toyroom", true)
-	light_omni(Vector3(9, y + 3.0, 16), Color(1.0, 0.75, 0.7), 0.9, 9.0, "toyroom")
-	light_omni(Vector3(17, y + 3.0, 16), Color(1.0, 0.75, 0.7), 0.9, 9.0, "toyroom")
+	light_omni(Vector3(9, y + 3.0, 16), Color(1.0, 0.75, 0.7), 1.3, 9.0, "toyroom")
+	light_omni(Vector3(17, y + 3.0, 16), Color(1.0, 0.75, 0.7), 1.3, 9.0, "toyroom")
+	# Nightlight by the dollhouse: a small warm pool of light the dolls like to stand in
+	mesh_at(P.sphere(0.07, "e_amber"), Vector3(18.5, y + 1.32, 20.6))
+	light_omni(Vector3(18.5, y + 1.4, 20.4), Color(1.0, 0.6, 0.3), 0.8, 4.0, "toyroom")
 	emitter("music_box_loop", Vector3(5.2, y + 1.0, 11.2), -14.0, 3.0)
 	emergency(Vector3(12, y + 3.4, 10.4), "toyroom")
 
