@@ -76,6 +76,7 @@ func _build() -> void:
 
 	_crosshair = ColorRect.new()
 	_crosshair.color = Color(1, 1, 1, 0.6)
+	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE # it sits under the captured cursor
 	_place(_crosshair, Control.PRESET_CENTER, Vector2(-2, -2), Vector2(4, 4))
 	root.add_child(_crosshair)
 

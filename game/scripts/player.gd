@@ -48,14 +48,20 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
-func _unhandled_input(event: InputEvent) -> void:
+# Mouse look uses _input (not _unhandled_input) so UI elements can never swallow it.
+func _input(event: InputEvent) -> void:
 	if controls_locked:
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
 		head.rotate_x(-event.relative.y * MOUSE_SENSITIVITY)
 		head.rotation.x = clampf(head.rotation.x, deg_to_rad(-85), deg_to_rad(85))
-	elif event.is_action_pressed("flashlight"):
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if controls_locked:
+		return
+	if event.is_action_pressed("flashlight"):
 		toggle_flashlight()
 	elif event.is_action_pressed("interact"):
 		if focus and focus.active:
