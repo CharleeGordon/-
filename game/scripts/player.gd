@@ -63,6 +63,8 @@ func _ready() -> void:
 	_base_light_energy = flashlight.light_energy
 	flashlight.visible = false
 	hand.visible = false
+	for part in ["Body", "Head", "Lens"]:
+		(hand.get_node(part) as Node3D).rotation_degrees = Vector3(-90, 0, 0) # cylinder top points forward
 	for s in ["marble", "wood", "stone", "carpet", "concrete"]:
 		var arr: Array[AudioStream] = []
 		for i in range(1, 5):

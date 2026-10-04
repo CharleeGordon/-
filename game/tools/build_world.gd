@@ -1142,7 +1142,7 @@ func _enemy(n: String, script_key: String, model: Node3D, pos: Vector3, yaw_deg:
 func _markers() -> void:
 	_enemy("Knight", "knight", P.knight_model(), Vector3(0, 0.0, -3.0), 180.0)
 	_enemy("Mummy", "mummy", P.mummy_model(), Vector3(6, 0.0, -20.5), 180.0)
-	var auto := _enemy("Automaton", "automaton", P.automaton_model(), Vector3(12, 0.5, 20.9), 180.0)
+	var auto := _enemy("Automaton", "automaton", P.automaton_model(), Vector3(12, 0.5, 20.9), 0.0)
 	auto.get_node("Collision").position.y = 0.65
 	var duchess := _enemy("Duchess", "duchess", P.wax_figure({"top": "cloth_red", "legs": "cloth_red", "dress": true, "skin": "porcelain", "eye": "eye_dark"}), Vector3(-6, 0, -20.6), 0.0)
 	duchess.visible = false
