@@ -1,14 +1,37 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
+[ext_resource type="Material" path="res://materials/black_plastic.tres" id="2_plastic"]
+[ext_resource type="Material" path="res://materials/metal.tres" id="3_metal"]
+[ext_resource type="Texture2D" path="res://textures/flashlight_cookie.png" id="4_cookie"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
-radius = 0.35
+radius = 0.32
 height = 1.8
+
+[sub_resource type="CylinderMesh" id="Body"]
+material = ExtResource("2_plastic")
+top_radius = 0.018
+bottom_radius = 0.018
+height = 0.13
+radial_segments = 16
+
+[sub_resource type="CylinderMesh" id="Head"]
+material = ExtResource("3_metal")
+top_radius = 0.034
+bottom_radius = 0.024
+height = 0.06
+radial_segments = 16
+
+[sub_resource type="CylinderMesh" id="Lens"]
+top_radius = 0.03
+bottom_radius = 0.03
+height = 0.004
+radial_segments = 16
 
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 2
-collision_mask = 1
+collision_mask = 17
 floor_snap_length = 0.3
 script = ExtResource("1_player")
 
@@ -17,30 +40,61 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
 
 [node name="Head" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.62, 0)
 
 [node name="Camera" type="Camera3D" parent="Head"]
 current = true
 fov = 75.0
-near = 0.05
+near = 0.03
+far = 200.0
 
-[node name="Flashlight" type="SpotLight3D" parent="Head/Camera"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, -0.15, 0)
-light_color = Color(1, 0.93, 0.8, 1)
-light_energy = 3.0
+[node name="Hand" type="Node3D" parent="Head/Camera"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.26, -0.26, -0.5)
+
+[node name="Body" type="MeshInstance3D" parent="Head/Camera/Hand"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0.0)
+mesh = SubResource("Body")
+cast_shadow = 0
+
+[node name="Head" type="MeshInstance3D" parent="Head/Camera/Hand"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, -0.08)
+mesh = SubResource("Head")
+cast_shadow = 0
+
+[node name="Lens" type="MeshInstance3D" parent="Head/Camera/Hand"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, -0.111)
+mesh = SubResource("Lens")
+cast_shadow = 0
+
+[node name="Flashlight" type="SpotLight3D" parent="Head/Camera/Hand"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.12)
+light_color = Color(1, 0.94, 0.82, 1)
+light_energy = 4.0
+light_projector = ExtResource("4_cookie")
+light_volumetric_fog_energy = 1.5
 shadow_enabled = true
-spot_range = 18.0
-spot_attenuation = 0.8
-spot_angle = 26.0
-spot_angle_attenuation = 1.6
+shadow_bias = 0.05
+spot_range = 20.0
+spot_attenuation = 0.9
+spot_angle = 27.0
+spot_angle_attenuation = 1.4
 
 [node name="InteractRay" type="RayCast3D" parent="Head/Camera"]
 target_position = Vector3(0, 0, -2.6)
-collision_mask = 9
+collision_mask = 25
 collide_with_areas = true
 
 [node name="Sfx" type="AudioStreamPlayer" parent="."]
-volume_db = -6.0
+bus = &"SFX"
 
 [node name="Steps" type="AudioStreamPlayer" parent="."]
-volume_db = -10.0
+volume_db = -9.0
+bus = &"SFX"
+
+[node name="Breath" type="AudioStreamPlayer" parent="."]
+volume_db = -8.0
+bus = &"SFX"
+
+[node name="Heart" type="AudioStreamPlayer" parent="."]
+volume_db = -8.0
+bus = &"SFX"

@@ -1,0 +1,18 @@
+[gd_resource type="StandardMaterial3D" load_steps=4 format=3]
+
+[ext_resource type="Texture2D" path="res://textures/gold_albedo.jpg" id="1_aktan"]
+[ext_resource type="Texture2D" path="res://textures/gold_normal.jpg" id="2_jq8c7"]
+[ext_resource type="Texture2D" path="res://textures/gold_rough.jpg" id="3_jjifk"]
+
+[resource]
+resource_name = "brass"
+albedo_color = Color(0.75, 0.6, 0.4, 1)
+albedo_texture = ExtResource("1_aktan")
+metallic = 0.9
+roughness_texture = ExtResource("3_jjifk")
+normal_enabled = true
+normal_texture = ExtResource("2_jq8c7")
+uv1_scale = Vector3(2, 2, 2)
+uv1_triplanar = true
+uv1_triplanar_sharpness = 4.0
+texture_filter = 5

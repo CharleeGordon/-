@@ -1,0 +1,16 @@
+[gd_resource type="StandardMaterial3D" load_steps=4 format=3]
+
+[ext_resource type="Texture2D" path="res://textures/dark_wood_albedo.jpg" id="1_83huq"]
+[ext_resource type="Texture2D" path="res://textures/dark_wood_normal.jpg" id="2_rm65q"]
+[ext_resource type="Texture2D" path="res://textures/dark_wood_rough.jpg" id="3_0pyli"]
+
+[resource]
+resource_name = "dark_wood_obj"
+albedo_texture = ExtResource("1_83huq")
+roughness_texture = ExtResource("3_0pyli")
+normal_enabled = true
+normal_texture = ExtResource("2_rm65q")
+uv1_scale = Vector3(1.5, 1.5, 1.5)
+uv1_triplanar = true
+uv1_triplanar_sharpness = 4.0
+texture_filter = 5

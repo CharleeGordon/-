@@ -7,13 +7,15 @@ config_version=5
 
 config/name="Do Not Touch the Exhibits"
 config/description="First-person survival horror comedy. You are the night guard. The exhibits disagree."
-config/version="0.1.0-mvp"
+config/version="0.2.0"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
 
+Save="*res://autoload/save.gd"
+Music="*res://autoload/music.gd"
 Shift="*res://autoload/shift.gd"
 
 [display]
@@ -29,7 +31,13 @@ window/stretch/aspect="expand"
 3d_physics/layer_2="player"
 3d_physics/layer_3="enemies"
 3d_physics/layer_4="interactables"
+3d_physics/layer_5="doors"
 
 [rendering]
 
 anti_aliasing/quality/msaa_3d=2
+lights_and_shadows/directional_shadow/size=4096
+lights_and_shadows/positional_shadow/atlas_size=4096
+environment/volumetric_fog/volume_size=96
+environment/volumetric_fog/volume_depth=96
+textures/default_filters/anisotropic_filtering_level=3

@@ -1,0 +1,16 @@
+[gd_resource type="StandardMaterial3D" load_steps=4 format=3]
+
+[ext_resource type="Texture2D" path="res://textures/uniform_albedo.jpg" id="1_wtucd"]
+[ext_resource type="Texture2D" path="res://textures/uniform_normal.jpg" id="2_mheqq"]
+[ext_resource type="Texture2D" path="res://textures/uniform_rough.jpg" id="3_sxexo"]
+
+[resource]
+resource_name = "uniform"
+albedo_texture = ExtResource("1_wtucd")
+roughness_texture = ExtResource("3_sxexo")
+normal_enabled = true
+normal_texture = ExtResource("2_mheqq")
+uv1_scale = Vector3(2, 2, 2)
+uv1_triplanar = true
+uv1_triplanar_sharpness = 4.0
+texture_filter = 5

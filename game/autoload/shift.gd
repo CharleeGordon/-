@@ -1,6 +1,6 @@
 extends Node
-## Global state of the night shift: clock, tasks, write-ups, power, messages.
-## Autoloaded as "Shift". Story reactions live in scripts/game.gd.
+## State of the current night: clock, tasks, write-ups, power, flags, checkpoint.
+## Autoloaded as "Shift". Story logic lives in scripts/nights/night_*.gd.
 
 signal clock_changed(text: String)
 signal hour_changed(hour: int)
@@ -9,45 +9,67 @@ signal writeup_added(count: int, reason: String)
 signal message(text: String, speaker: String, duration: float)
 signal alert(text: String)
 signal power_changed(on: bool)
-signal noise(position: Vector3)
+signal noise(position: Vector3, radius: float)
 signal interact_requested(action_id: String, node: Node)
 signal caught(enemy: Node3D, cause: String)
 signal game_ended(won: bool, title: String, reason: String)
 
 const SECONDS_PER_HOUR := 100.0 # 6 in-game hours = 10 real minutes
 const END_HOUR := 6
-const MAX_WRITEUPS := 3
+const CHECKPOINT_HOUR := 3
+const LAST_NIGHT := 5
 
+const NIGHT_TITLES := {
+	1: ["NIGHT 1", "Orientation"],
+	2: ["NIGHT 2", "Clockwork"],
+	3: ["NIGHT 3", "Portrait Night"],
+	4: ["NIGHT 4", "The Other Guard"],
+	5: ["NIGHT 5", "Closing Time"],
+}
+
+const RULES := [
+	"1. The Security Office is a safe zone. Exhibits are not allowed inside (union rules).",
+	"2. Do NOT run in the Egyptian Hall. The Mummy is a light sleeper.",
+	"3. Sir Clanksworth (the armour) only moves when nobody is looking. So keep looking.",
+	"4. Do not shine your flashlight into Gerald's eyes. Gerald is very shy.",
+	"5. Do not touch the exhibits. Yes, this means you.",
+	"6. Three write-ups and you're fired. Clock out at 6:00 AM sharp.",
+]
+const NIGHT_RULES := {
+	2: "7. Keep Little Wolfgang wound up. Always. ALWAYS.",
+	3: "8. When the paintings are watching, stand perfectly still.",
+	4: "9. The Night Guard in the Wax Hall is NOT a colleague. Stay out of his flashlight.",
+	5: "10. Whatever happens tonight: do not drop the Duck.",
+}
+
+var night := 1
 var running := false
 var elapsed := 0.0
 var hour := 0
 var power_on := true
 var tasks: Array[Dictionary] = []
 var writeups: Array[String] = []
+var flags := {}
+var checkpoint := {}          # snapshot taken when the clock hits CHECKPOINT_HOUR
+var pending_checkpoint := {}  # set before reloading the scene to resume from it
 var _last_clock_text := ""
-
-const RULES := [
-	"1. The Security Office is a safe zone. Exhibits are not allowed inside (union rules).",
-	"2. Do NOT run in the Egyptian Hall. The Mummy is a light sleeper.",
-	"3. Sir Clanksworth (the armor) only moves when nobody is looking. So keep looking.",
-	"4. Do not shine your flashlight into Gerald's eyes. Gerald is very shy.",
-	"5. Do not touch the exhibits. Yes, this means you.",
-	"6. Three write-ups and you're fired. Clock out at 6:00 AM sharp.",
-]
 
 
 func _ready() -> void:
-	process_mode = Node.PROCESS_MODE_ALWAYS # so F11 works in menus; the clock checks pause itself
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_input()
 
 
-func start_shift() -> void:
+func start_shift(n: int) -> void:
+	night = n
 	running = true
 	elapsed = 0.0
 	hour = 0
 	power_on = true
 	tasks.clear()
 	writeups.clear()
+	flags.clear()
+	checkpoint = {}
 	_last_clock_text = ""
 	tasks_changed.emit()
 	_emit_clock()
@@ -55,6 +77,27 @@ func start_shift() -> void:
 
 func stop() -> void:
 	running = false
+
+
+func difficulty() -> int:
+	return int(Save.settings.get("difficulty", 1))
+
+
+## Enemy speed multiplier from the difficulty setting.
+func speed_mult() -> float:
+	return 0.8 if difficulty() == 0 else 1.0
+
+
+func max_writeups() -> int:
+	return 5 if difficulty() == 0 else 3
+
+
+func rules_for_night() -> Array:
+	var out := RULES.duplicate()
+	for n in range(2, night + 1):
+		if NIGHT_RULES.has(n):
+			out.append(NIGHT_RULES[n])
+	return out
 
 
 func _process(delta: float) -> void:
@@ -67,8 +110,10 @@ func _process(delta: float) -> void:
 func _update_hour() -> void:
 	var new_hour := int(elapsed / SECONDS_PER_HOUR)
 	_emit_clock()
-	if new_hour != hour:
-		hour = new_hour
+	while new_hour > hour:
+		hour += 1
+		if hour == CHECKPOINT_HOUR and checkpoint.is_empty():
+			take_checkpoint()
 		hour_changed.emit(hour)
 
 
@@ -92,6 +137,41 @@ func skip_hour() -> void:
 		return
 	elapsed = (hour + 1) * SECONDS_PER_HOUR + 0.01
 	_update_hour()
+
+
+# --- Checkpoint ----------------------------------------------------------
+
+func take_checkpoint() -> void:
+	checkpoint = {
+		"night": night,
+		"hour": CHECKPOINT_HOUR,
+		"tasks": tasks.duplicate(true),
+		"writeups": writeups.duplicate(),
+		"flags": flags.duplicate(true),
+	}
+
+
+func has_checkpoint() -> bool:
+	return not checkpoint.is_empty() and int(checkpoint.get("night", 0)) == night
+
+
+## Restores tasks/flags from a checkpoint and sets the clock a few seconds before it.
+func resume_from(cp: Dictionary) -> void:
+	night = int(cp["night"])
+	running = true
+	tasks.clear()
+	for t in cp["tasks"]:
+		tasks.append(t.duplicate(true))
+	writeups.clear()
+	for w in cp["writeups"]:
+		writeups.append(w)
+	flags = cp["flags"].duplicate(true)
+	checkpoint = cp.duplicate(true)
+	hour = int(cp["hour"]) - 1
+	elapsed = cp["hour"] * SECONDS_PER_HOUR - 4.0
+	power_on = true
+	tasks_changed.emit()
+	_emit_clock()
 
 
 # --- Tasks ---------------------------------------------------------------
@@ -137,6 +217,15 @@ func complete_task(id: String) -> void:
 	t["progress"] = t["goal"]
 	alert.emit("TASK COMPLETE: " + t["text"])
 	tasks_changed.emit()
+	if id != "survive":
+		Music.sting("sting_task", -6.0, 0.5)
+
+
+func remove_task(id: String) -> void:
+	var t := _find_task(id)
+	if t != {}:
+		tasks.erase(t)
+		tasks_changed.emit()
 
 
 func task_label(t: Dictionary) -> String:
@@ -167,9 +256,10 @@ func add_writeup(reason: String) -> void:
 		return
 	writeups.append(reason)
 	writeup_added.emit(writeups.size(), reason)
-	if writeups.size() >= MAX_WRITEUPS:
+	Music.sting("sting_writeup", -4.0, 2.0)
+	if writeups.size() >= max_writeups():
 		end_game(false, "YOU'RE FIRED",
-			"Three write-ups in one night. Brenda has already put your photo on the wall of shame.\nLast straw: " + reason)
+			"Too many write-ups in one night. Brenda has already put your photo on the Wall of Shame.\nLast straw: " + reason)
 
 
 # --- Misc ----------------------------------------------------------------
@@ -185,8 +275,8 @@ func set_power(on: bool) -> void:
 	power_changed.emit(on)
 
 
-func make_noise(pos: Vector3) -> void:
-	noise.emit(pos)
+func make_noise(pos: Vector3, radius: float = 30.0) -> void:
+	noise.emit(pos, radius)
 
 
 ## Called by an enemy that reached the player. game.gd plays the scare, then calls end_game.
@@ -210,12 +300,18 @@ func _setup_input() -> void:
 	_bind("move_left", [KEY_A, KEY_LEFT])
 	_bind("move_right", [KEY_D, KEY_RIGHT])
 	_bind("sprint", [KEY_SHIFT])
+	_bind("crouch", [KEY_CTRL, KEY_C])
 	_bind("interact", [KEY_E])
 	_bind("flashlight", [KEY_F])
 	_bind("journal", [KEY_TAB, KEY_J])
 	_bind("pause", [KEY_ESCAPE])
 	_bind("fullscreen", [KEY_F11])
 	_bind("debug_skip_hour", [KEY_F9])
+	if not InputMap.has_action("interact_mouse"):
+		InputMap.add_action("interact_mouse")
+		var mb := InputEventMouseButton.new()
+		mb.button_index = MOUSE_BUTTON_LEFT
+		InputMap.action_add_event("interact_mouse", mb)
 
 
 func _bind(action: String, keys: Array) -> void:
@@ -229,8 +325,4 @@ func _bind(action: String, keys: Array) -> void:
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("fullscreen"):
-		var mode := DisplayServer.window_get_mode()
-		if mode == DisplayServer.WINDOW_MODE_FULLSCREEN or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
-			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-		else:
-			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		Save.set_setting("fullscreen", not bool(Save.settings["fullscreen"]))
